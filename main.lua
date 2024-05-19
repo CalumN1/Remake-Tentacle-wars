@@ -22,6 +22,11 @@ function love.load()
 
     nodeSelected = 0
 
+    cutSource = {
+    	--x = 5
+    	-- y = 10
+    }
+
 
     nodes = {
         {
@@ -222,8 +227,21 @@ function love.draw(mouseX, mouseY)
 	-- draw line between linked nodes
 	-- this is first so its underneath nodes
 	love.graphics.setColor(0.9, 0.9, 0.2)
-	for connectionIndex, connection in ipairs(connections) do
-		love.graphics.line(nodes[connection.source].x, nodes[connection.source].y, nodes[connection.target].x, nodes[connection.target].y)
+	for connectionIndex, connection in ipairs(connections) do 
+		-- start, 1/8th of the way to the end, 2/8ths, etc. abs timer part ranges linearly from 0.5 to 0 and back to 0.5
+		-- to do: draw a circle at each of these points below then can have the colour change to show flow, and create a loop so size can vary
+		love.graphics.line(nodes[connection.source].x, nodes[connection.source].y,
+			(((7*nodes[connection.source].x) + (1*nodes[connection.target].x))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5), (((7*nodes[connection.source].y) + (1*nodes[connection.target].y))/8)+(((math.abs(((timer)%1)-0.5))*20)-5),
+			(((6*nodes[connection.source].x) + (2*nodes[connection.target].x))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5), (((6*nodes[connection.source].y) + (2*nodes[connection.target].y))/8)+(((math.abs(((timer+0.1)%1)-0.5))*20)-5),
+			(((5*nodes[connection.source].x) + (3*nodes[connection.target].x))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5), (((5*nodes[connection.source].y) + (3*nodes[connection.target].y))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5),
+			(((4*nodes[connection.source].x) + (4*nodes[connection.target].x))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5), (((4*nodes[connection.source].y) + (4*nodes[connection.target].y))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5),
+			(((3*nodes[connection.source].x) + (5*nodes[connection.target].x))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5), (((3*nodes[connection.source].y) + (5*nodes[connection.target].y))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5),
+			(((2*nodes[connection.source].x) + (6*nodes[connection.target].x))/8)+(((math.abs(((timer+0.7)%1)-0.5))*20)-5), (((2*nodes[connection.source].y) + (6*nodes[connection.target].y))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5),
+			(((1*nodes[connection.source].x) + (7*nodes[connection.target].x))/8)+(((math.abs(((timer+0.8)%1)-0.5))*20)-5), (((1*nodes[connection.source].y) + (7*nodes[connection.target].y))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5),
+
+
+
+			nodes[connection.target].x, nodes[connection.target].y)
 	end
 
 	-- draw all nodes and population number
