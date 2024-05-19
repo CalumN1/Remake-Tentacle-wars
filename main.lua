@@ -17,7 +17,7 @@ function love.load()
     font20 = love.graphics.newFont(20)
     font28 = love.graphics.newFont(28)
 
-	nodeRadius = 35
+	nodeRadius = 30
 
 
     nodeSelected = 0
@@ -93,7 +93,7 @@ function love.load()
     function isMouseInNode()
         
     	for nodeIndex, node in ipairs(nodes) do
-	    	if math.sqrt((love.mouse.getX() - node.x)^2 - (love.mouse.getY() - node.y)^2) < 10 then
+	    	if math.sqrt((love.mouse.getX() - node.x)^2 + (love.mouse.getY() - node.y)^2) < nodeRadius+10 then
 				return nodeIndex
 			end
 
@@ -217,13 +217,13 @@ end
 function love.draw(mouseX, mouseY)
 
 
-	love.graphics.setFont(font14)
+	love.graphics.setFont(font20)
 
 	-- draw line between linked nodes
 	-- this is first so its underneath nodes
 	love.graphics.setColor(0.9, 0.9, 0.2)
 	for connectionIndex, connection in ipairs(connections) do
-		love.graphics.line(nodes[connection.source].x+20, nodes[connection.source].y+20, nodes[connection.target].x+20, nodes[connection.target].y+20)
+		love.graphics.line(nodes[connection.source].x, nodes[connection.source].y, nodes[connection.target].x, nodes[connection.target].y)
 	end
 
 	-- draw all nodes and population number
@@ -242,20 +242,40 @@ function love.draw(mouseX, mouseY)
 		love.graphics.circle('fill', node.x, node.y, nodeRadius)
 		-- border
 		love.graphics.setColor(1, 1, 1)
+		love.graphics.setLineWidth( 3 )
 		love.graphics.circle('line', node.x, node.y, nodeRadius)
+		-- outer ring
+		love.graphics.circle('line', node.x, node.y, nodeRadius+10)
+
+	 	--feelers
+	 	love.graphics.setLineWidth( 1 )
+	 	for i = 1, 8 do
+			love.graphics.line(node.x, node.y-(nodeRadius+10), 
+				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.1), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.25),
+				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.3), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.5),
+				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.6), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.75),
+				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*1), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*1))
+
+			--rotate the whole screen centred on the node, redraw the feeler
+			love.graphics.translate(node.x, node.y)
+			love.graphics.rotate(math.pi/4)
+			love.graphics.translate(-node.x, -node.y)
+		end
+		-- reset origin
+		love.graphics.origin()
 
 		-- draw population number
 		love.graphics.setFont(font20)
 		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(node.population, node.x-nodeRadius, node.y-6, 2*nodeRadius, "center")
+		love.graphics.printf(node.population, node.x-nodeRadius, node.y-18, 2*nodeRadius, "center")
 	end
 
 	
 	-- draw line between mouse and NODE after node selected
 	love.graphics.setColor(0.8, 0.8, 0)
 	if love.mouse.isDown(1) and nodeSelected > 0 then
-		love.graphics.line(nodes[nodeSelected].x+20, nodes[nodeSelected].y+20, love.mouse.getX(), love.mouse.getY())
-		love.graphics.line(nodes[nodeSelected].x+20, nodes[nodeSelected].y+20, love.mouse.getX(), love.mouse.getY())
+		love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
+		love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
 	end
 
 end
