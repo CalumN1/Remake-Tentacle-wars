@@ -19,6 +19,9 @@ function love.load()
 
 	nodeRadius = 30
 
+	linkRadius = 8
+	linkSpacing = 7
+
 
     nodeSelected = 0
 
@@ -77,28 +80,27 @@ function love.load()
     }
 
     connections = {
-        --{
-            --source = 2,
-            --target = 3,
-            --population = 2
-        --}
+        {
+            source = 2,
+            target = 3,
+            population = 2,
+            linkXStep = 23,
+            linkYStep = 10,
+            links = {
+            	x = 200,
+            	y = 200
+
+            }
+        
+        }
     }
 
-
-    units = {
-    	--{
-    	--	source = 1,
-    	--	target = 1,
-    	--	population = 10,
-    	--	team = 1
-    	--},
-    }
 
 
     function isMouseInNode()
         
     	for nodeIndex, node in ipairs(nodes) do
-	    	if math.sqrt((love.mouse.getX() - node.x)^2 + (love.mouse.getY() - node.y)^2) < nodeRadius+10 then
+	    	if distancebetween(love.mouse.getX(), love.mouse.getY(), node.x, node.y) < nodeRadius+10 then
 				return nodeIndex
 			end
 
@@ -112,12 +114,30 @@ function love.load()
 
 end
 
+function distancebetween(x1,y1,x2,y2)
+
+	return math.sqrt((x1 - x2)^2 + (y1 - y2)^2)
+
+end
+
+function calculateSteps(x1,y1,x2,y2)
+	-- ratio of lengths: source to point vs source to end
+	local ratio = (2*linkRadius+linkSpacing)/(distancebetween(x1,y1,x2,y2)-(2*nodeRadius)+linkRadius) -- e.g. 1/15
+	print("ratio: ", ratio)
+	local xStep = (x2 - x1)*ratio
+	print("xStep: ", xStep)
+	local yStep = (y2 - y1)*ratio
+
+	return {x = xStep, y = yStep}
+
+
+end
 
 
 function love.update(dt)
 
 	timer = timer + dt
-	print(timer)
+	-- print(timer)
 
 	-- remove duplicate connections
 	for connectionIndex1, connection1 in ipairs(connections) do
@@ -143,9 +163,20 @@ function love.mousereleased(mouseX, mouseY)
 	and releasenode > 0 
 	and nodeSelected ~= releasenode   -- means not equal
 	then
+
+			local linkSteps = calculateSteps(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)
+			-- print(linkSteps.x,linkSteps.y)
 			table.insert(connections, {
-			source = nodeSelected, target = releasenode, population = nodes[nodeSelected].population
+			source = nodeSelected, target = releasenode, population = nodes[nodeSelected].population, linkXStep = linkSteps.x, linkYStep = linkSteps.y, links = {}
 			})
+			print(math.floor(distancebetween(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)/(2*linkRadius+linkSpacing)))
+			-- loops from 1 to number of nodes that would fit in the distance 
+			for i = 1, math.floor(distancebetween(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)/(2*linkRadius+linkSpacing)) do
+				table.insert(connections[#connections].links, {
+					x = nodes[nodeSelected].x + (connections[#connections].linkXStep*i),
+					y = nodes[nodeSelected].y + (connections[#connections].linkYStep*i)
+				})
+			end
 		
 		-- print whenever a connection is made
 		for connectionIndex, connection in ipairs(connections) do
@@ -226,23 +257,54 @@ function love.draw(mouseX, mouseY)
 
 	-- draw line between linked nodes
 	-- this is first so its underneath nodes
-	love.graphics.setColor(0.9, 0.9, 0.2)
+	
 	for connectionIndex, connection in ipairs(connections) do 
+		love.graphics.setColor(0.9, 0.9, 0.2)
 		-- start, 1/8th of the way to the end, 2/8ths, etc. abs timer part ranges linearly from 0.5 to 0 and back to 0.5
 		-- to do: draw a circle at each of these points below then can have the colour change to show flow, and create a loop so size can vary
-		love.graphics.line(nodes[connection.source].x, nodes[connection.source].y,
+		-- also maybe need to add noderadius to start and end points? to look like how tentacle wars does it
+
+		--this part is just the connection lin to remove once proper links added
+		love.graphics.line( --nodes[connection.source].x, nodes[connection.source].y,
 			(((7*nodes[connection.source].x) + (1*nodes[connection.target].x))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5), (((7*nodes[connection.source].y) + (1*nodes[connection.target].y))/8)+(((math.abs(((timer)%1)-0.5))*20)-5),
 			(((6*nodes[connection.source].x) + (2*nodes[connection.target].x))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5), (((6*nodes[connection.source].y) + (2*nodes[connection.target].y))/8)+(((math.abs(((timer+0.1)%1)-0.5))*20)-5),
 			(((5*nodes[connection.source].x) + (3*nodes[connection.target].x))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5), (((5*nodes[connection.source].y) + (3*nodes[connection.target].y))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5),
 			(((4*nodes[connection.source].x) + (4*nodes[connection.target].x))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5), (((4*nodes[connection.source].y) + (4*nodes[connection.target].y))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5),
 			(((3*nodes[connection.source].x) + (5*nodes[connection.target].x))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5), (((3*nodes[connection.source].y) + (5*nodes[connection.target].y))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5),
 			(((2*nodes[connection.source].x) + (6*nodes[connection.target].x))/8)+(((math.abs(((timer+0.7)%1)-0.5))*20)-5), (((2*nodes[connection.source].y) + (6*nodes[connection.target].y))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5),
-			(((1*nodes[connection.source].x) + (7*nodes[connection.target].x))/8)+(((math.abs(((timer+0.8)%1)-0.5))*20)-5), (((1*nodes[connection.source].y) + (7*nodes[connection.target].y))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5),
+			(((1*nodes[connection.source].x) + (7*nodes[connection.target].x))/8)+(((math.abs(((timer+0.8)%1)-0.5))*20)-5), (((1*nodes[connection.source].y) + (7*nodes[connection.target].y))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5)
 
 
+			)
+			--nodes[connection.target].x, nodes[connection.target].y)
 
-			nodes[connection.target].x, nodes[connection.target].y)
+		-- link making and wobble:
+				-- ((timer%2)*math.pi)  > this moves smoothly and linearly from 0 to 359.9
+				-- the sin of that varies non linearly, like a sin wave from 0 to 1 to -1 to 0
+				-- then that number is scaled up relative to the X or Y linkStep, 
+				-- the bigger the X step the more it should wobble in Y, hence the flipped X or Y step for scaling
+
+		for linkIndex, link in ipairs(connection.links) do 
+			local xwobble = 0
+			local ywobble = 0
+			if linkIndex > 1 and linkIndex < #connection.links then
+				xwobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkYStep/3
+				ywobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkXStep/3
+			end
+			love.graphics.setColor(0.1, 0.7, 0.1)
+			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius)
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.line(link.x, link.y, link.x-connection.linkYStep, link.y+connection.linkXStep)
+			love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)
+			-- border
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setLineWidth( 1 )
+			love.graphics.circle('line', link.x-xwobble, link.y+ywobble, linkRadius)
+
+		end
+
 	end
+
 
 	-- draw all nodes and population number
 	for nodeIndex, node in ipairs(nodes) do
@@ -250,7 +312,7 @@ function love.draw(mouseX, mouseY)
 		if node.team == 0 then
 			love.graphics.setColor(0.7, 0.7, 0.7)
 		elseif node.team == 1 then
-		    love.graphics.setColor(0.1, 0.9, 0.2)
+		    love.graphics.setColor(0.1, 0.7, 0.1)
 		elseif node.team == 2 then
 		    love.graphics.setColor(0.7, 0.2, 0.2)
 		else
