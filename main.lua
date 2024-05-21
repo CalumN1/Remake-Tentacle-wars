@@ -17,10 +17,10 @@ function love.load()
     font20 = love.graphics.newFont(20)
     font28 = love.graphics.newFont(28)
 
-	nodeRadius = 30
+	nodeRadius = 40  -- outer ring
 
 	linkRadius = 8
-	linkSpacing = 7
+	linkSpacing = 6
 
 
     nodeSelected = 0
@@ -95,6 +95,10 @@ function love.load()
         }
     }
 
+    edgesTemp = {
+        
+        }
+
 
 
     function isMouseInNode()
@@ -120,15 +124,71 @@ function distancebetween(x1,y1,x2,y2)
 
 end
 
-function calculateSteps(x1,y1,x2,y2)
+function calculateSteps(x1,y1,x2,y2, extraSpacing)
 	-- ratio of lengths: source to point vs source to end
-	local ratio = (2*linkRadius+linkSpacing)/(distancebetween(x1,y1,x2,y2)-(2*nodeRadius)+linkRadius) -- e.g. 1/15
+	local ratio = (2*linkRadius+linkSpacing+extraSpacing)/(distancebetween(x1,y1,x2,y2)) -- e.g. 1/15
 	print("ratio: ", ratio)
 	local xStep = (x2 - x1)*ratio
 	print("xStep: ", xStep)
 	local yStep = (y2 - y1)*ratio
 
 	return {x = xStep, y = yStep}
+
+
+end
+
+function calculateNodeEdges(sourceNode, targetNode)
+
+	-- triangles, trigonometry, hope it works!
+	local longHypot = distancebetween(nodes[sourceNode].x, nodes[sourceNode].y, nodes[targetNode].x, nodes[targetNode].y)
+	local longXOpposite = math.abs(nodes[sourceNode].x - nodes[targetNode].x )
+	local longYAdjacent = math.abs(nodes[sourceNode].y - nodes[targetNode].y )
+
+	local sourceAngle = math.asin(longXOpposite/longHypot)
+
+	local shortHypot = nodeRadius
+	local shortXOpposite = shortHypot * math.sin(sourceAngle)
+	local shortYAdjacent = shortHypot * math.cos(sourceAngle)
+
+	print(shortYOpposite)
+
+	-- source
+	if (nodes[sourceNode].x < nodes[targetNode].x) then
+		sourceX = nodes[sourceNode].x + shortXOpposite
+	else
+		sourceX = nodes[sourceNode].x - shortXOpposite
+	end
+
+	if (nodes[sourceNode].y < nodes[targetNode].y) then
+		sourceY = nodes[sourceNode].y + shortYAdjacent
+	else
+		sourceY = nodes[sourceNode].y - shortYAdjacent
+	end
+
+
+	-- target
+	-- reverse of source
+	if (nodes[sourceNode].x < nodes[targetNode].x) then
+		targetX = nodes[targetNode].x - shortXOpposite
+	else
+		targetX = nodes[targetNode].x + shortXOpposite
+	end
+
+	if (nodes[sourceNode].y < nodes[targetNode].y) then
+		targetY = nodes[targetNode].y - shortYAdjacent
+	else
+		targetY = nodes[targetNode].y + shortYAdjacent
+	end
+
+
+
+	print("targetX: ",targetX, "   targetY: ", targetY)
+
+	table.insert(edgesTemp,{x = sourceX, y = sourceY})
+	table.insert(edgesTemp,{x = targetX, y = targetY})
+
+	return {sourceX = sourceX, sourceY = sourceY, targetX = targetX, targetY = targetY}
+
 
 
 end
@@ -163,22 +223,30 @@ function love.mousereleased(mouseX, mouseY)
 	and releasenode > 0 
 	and nodeSelected ~= releasenode   -- means not equal
 	then
+		local edges = calculateNodeEdges(nodeSelected, releasenode)
+		print(edges.sourceX)
 
-			local linkSteps = calculateSteps(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)
-			-- print(linkSteps.x,linkSteps.y)
-			table.insert(connections, {
-			source = nodeSelected, target = releasenode, population = nodes[nodeSelected].population, linkXStep = linkSteps.x, linkYStep = linkSteps.y, links = {}
+		local numLinksToMake = math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
+		local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
+		extraSpacing = extraSpacing/numLinksToMake
+
+		local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
+
+		-- connection creation with no links
+		table.insert(connections, {
+		source = nodeSelected, target = releasenode, population = nodes[nodeSelected].population, linkXStep = linkSteps.x, linkYStep = linkSteps.y, links = {}
+		})
+
+		-- link creation
+			--loops from 1 to number of nodes that would fit in the distance 
+		for i = 1, numLinksToMake+1 do
+			table.insert(connections[#connections].links, {
+				x = edges.sourceX + (connections[#connections].linkXStep*(i-1)),
+				y = edges.sourceY + (connections[#connections].linkYStep*(i-1))
 			})
-			print(math.floor(distancebetween(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)/(2*linkRadius+linkSpacing)))
-			-- loops from 1 to number of nodes that would fit in the distance 
-			for i = 1, math.floor(distancebetween(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y)/(2*linkRadius+linkSpacing)) do
-				table.insert(connections[#connections].links, {
-					x = nodes[nodeSelected].x + (connections[#connections].linkXStep*i),
-					y = nodes[nodeSelected].y + (connections[#connections].linkYStep*i)
-				})
-			end
+		end
 		
-		-- print whenever a connection is made
+		-- print every current connection
 		for connectionIndex, connection in ipairs(connections) do
 			print(connection.source, " -> ", connection.target)
 		end
@@ -265,7 +333,7 @@ function love.draw(mouseX, mouseY)
 		-- also maybe need to add noderadius to start and end points? to look like how tentacle wars does it
 
 		--this part is just the connection lin to remove once proper links added
-		love.graphics.line( --nodes[connection.source].x, nodes[connection.source].y,
+		--[[love.graphics.line( --nodes[connection.source].x, nodes[connection.source].y,
 			(((7*nodes[connection.source].x) + (1*nodes[connection.target].x))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5), (((7*nodes[connection.source].y) + (1*nodes[connection.target].y))/8)+(((math.abs(((timer)%1)-0.5))*20)-5),
 			(((6*nodes[connection.source].x) + (2*nodes[connection.target].x))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5), (((6*nodes[connection.source].y) + (2*nodes[connection.target].y))/8)+(((math.abs(((timer+0.1)%1)-0.5))*20)-5),
 			(((5*nodes[connection.source].x) + (3*nodes[connection.target].x))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5), (((5*nodes[connection.source].y) + (3*nodes[connection.target].y))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5),
@@ -275,7 +343,7 @@ function love.draw(mouseX, mouseY)
 			(((1*nodes[connection.source].x) + (7*nodes[connection.target].x))/8)+(((math.abs(((timer+0.8)%1)-0.5))*20)-5), (((1*nodes[connection.source].y) + (7*nodes[connection.target].y))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5)
 
 
-			)
+			)]]
 			--nodes[connection.target].x, nodes[connection.target].y)
 
 		-- link making and wobble:
@@ -283,13 +351,16 @@ function love.draw(mouseX, mouseY)
 				-- the sin of that varies non linearly, like a sin wave from 0 to 1 to -1 to 0
 				-- then that number is scaled up relative to the X or Y linkStep, 
 				-- the bigger the X step the more it should wobble in Y, hence the flipped X or Y step for scaling
-
+				-- /3 at the end so the wobble is less dramatic 
 		for linkIndex, link in ipairs(connection.links) do 
 			local xwobble = 0
 			local ywobble = 0
-			if linkIndex > 1 and linkIndex < #connection.links then
+			if linkIndex > 2 and linkIndex < #connection.links -1 then
 				xwobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkYStep/3
 				ywobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkXStep/3
+			elseif linkIndex == 2 or linkIndex == #connection.links -1 then
+				xwobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkYStep/6
+				ywobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkXStep/6
 			end
 			love.graphics.setColor(0.1, 0.7, 0.1)
 			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius)
@@ -303,6 +374,9 @@ function love.draw(mouseX, mouseY)
 
 		end
 
+		--[[for edgeIndex, edge in ipairs(edgesTemp) do 
+			love.graphics.circle('fill', edge.x, edge.y, linkRadius)
+		end]]
 	end
 
 
@@ -319,18 +393,18 @@ function love.draw(mouseX, mouseY)
 			love.graphics.setColor(1, 1, 1)
 		end
 		-- draw node
-		love.graphics.circle('fill', node.x, node.y, nodeRadius)
+		-- love.graphics.circle('fill', node.x, node.y, nodeRadius-10)
 		-- border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
-		love.graphics.circle('line', node.x, node.y, nodeRadius)
+		love.graphics.circle('line', node.x, node.y, nodeRadius-10)
 		-- outer ring
-		love.graphics.circle('line', node.x, node.y, nodeRadius+10)
+		love.graphics.circle('line', node.x, node.y, nodeRadius)
 
 	 	--feelers
 	 	love.graphics.setLineWidth( 1 )
 	 	for i = 1, 8 do
-			love.graphics.line(node.x, node.y-(nodeRadius+10), 
+			love.graphics.line(node.x, node.y-(nodeRadius), 
 				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.1), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.25),
 				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.3), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.5),
 				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.6), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.75),
