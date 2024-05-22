@@ -24,6 +24,7 @@ function love.load()
 
 
     nodeSelected = 0
+    pointSelected = {}
 
     cutSource = {
     	--x = 5
@@ -36,7 +37,7 @@ function love.load()
             x = arenaWidth / 3,
             y = 100,
             team = 1,
-            population = 10,
+            population = 30,
             tier = 1,
             regenDelay = 5,
             regenTimer = 5
@@ -54,7 +55,7 @@ function love.load()
             x = 100,
             y = nodeMapHeight - 200,
             team = 0,
-            population = 10,
+            population = 50,
             tier = 1,
             regenDelay = 5,
             regenTimer = 5
@@ -81,23 +82,39 @@ function love.load()
 
     connections = {
         {
-            source = 2,
-            target = 3,
             population = 2,
+            team = 1,
+            moving = false,
+            source = 2,
+            sourceEdge = {
+            	x = 200,
+            	y = 200
+            },
+            target = 3,
+            targetEdge = {
+            	x = 200,
+            	y = 200
+            },
+            tentacleEnd = {
+            	x = 200,
+            	y = 200
+            },
+            connectionMidPoint = {
+            	x = 200,
+            	y = 200
+            },
             linkXStep = 23,
             linkYStep = 10,
             links = {
-            	x = 200,
-            	y = 200
-
-            }
-        
+            	{
+            		x = 200,
+            		y = 200
+            	}
+            },
+            destination = 2,
+        	opposedConnectionIndex = 0 -- 0 means no opposed connection
         }
     }
-
-    edgesTemp = {
-        
-        }
 
 
 
@@ -140,6 +157,8 @@ end
 function calculateNodeEdges(sourceNode, targetNode)
 
 	-- triangles, trigonometry, hope it works!
+	-- given 2 points with nodes
+
 	local longHypot = distancebetween(nodes[sourceNode].x, nodes[sourceNode].y, nodes[targetNode].x, nodes[targetNode].y)
 	local longXOpposite = math.abs(nodes[sourceNode].x - nodes[targetNode].x )
 	local longYAdjacent = math.abs(nodes[sourceNode].y - nodes[targetNode].y )
@@ -184,9 +203,6 @@ function calculateNodeEdges(sourceNode, targetNode)
 
 	print("targetX: ",targetX, "   targetY: ", targetY)
 
-	table.insert(edgesTemp,{x = sourceX, y = sourceY})
-	table.insert(edgesTemp,{x = targetX, y = targetY})
-
 	return {sourceX = sourceX, sourceY = sourceY, targetX = targetX, targetY = targetY}
 
 
@@ -202,6 +218,7 @@ function love.update(dt)
 	-- remove duplicate connections
 	for connectionIndex1, connection1 in ipairs(connections) do
 		for connectionIndex2, connection2 in ipairs(connections) do
+
 			if connection1.source == connection2.source and connection1.target == connection2.target and connectionIndex1 ~= connectionIndex2 then 
 				table.remove(connections, connectionIndex2)
 				print("removed duplicate: ", connection2.source, " -> ", connection2.target)
@@ -209,10 +226,103 @@ function love.update(dt)
 		end
 	end
 	
-
+	-- move this to run only when a cut, node-loss, or new connection is made
+	checkOpposedConnections()
 	
-	-- print(love.mouse.getY())
+	updateMovingConnections()
 end
+
+
+function updateMovingConnections()
+
+	for connectionIndex, connection in ipairs(connections) do
+		if connection.moving == true then
+			-- breaking a connection
+			if connection.destination == 0 then 
+				for linkIndex, link in ipairs(connection.links) do
+					link.x = link.x - (connection.linkXStep/7)
+					link.y = link.y - (connection.linkYStep/7)
+					if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+						table.remove(connection.links, linkIndex)
+						nodes[connection.source].population = nodes[connection.source].population + 1
+					end
+					if #connection.links == 0 then  -- could've also used tentacle end point
+						connection.moving = false
+						nodes[connection.source].population = nodes[connection.source].population - 1
+						table.remove(connections, connectionIndex)
+					end
+					
+				end
+
+			-- moving a connection to midpoint 
+			elseif connection.destination == 1 then
+				if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.sourceEdge.x, connection.sourceEdge.y) then
+					-- closer to target, so its long and needs to move back
+					if connection.tentacleEnd.x == connections[connection.opposedConnectionIndex].tentacleEnd.x then
+						-- touching
+						link.x = link.x - (connection.linkXStep/10)
+						link.y = link.y - (connection.linkYStep/10)
+					else
+						-- not touching
+						-- keep moving but check if touching
+					end
+				else
+					-- closer to source, so its short and should move forward
+
+				end
+			
+			-- moving a connection to target 
+			elseif connection.destination == 2 then
+				for linkIndex, link in ipairs(connection.links) do
+					link.x = link.x + (connection.linkXStep/20)
+					link.y = link.y + (connection.linkYStep/20)
+				end
+
+				-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
+				if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+					table.insert(connection.links, {
+						x = connection.links[#connection.links].x - (connection.linkXStep),
+						y = connection.links[#connection.links].y - (connection.linkYStep)
+					})
+					nodes[connection.source].population = nodes[connection.source].population - 1
+				end
+
+				-- reached target?
+				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
+				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeRadius then
+					connection.moving = false
+				end
+
+
+			end
+			if #connection.links > 0 then
+				connection.tentacleEnd.x = connection.links[1].x
+				connection.tentacleEnd.y = connection.links[1].y
+			end
+
+			if nodes[connection.source].population == 0 and connection.moving == true and connection.destination ~= 0 then
+				connection.destination = 0
+			end
+		end
+	end
+end
+
+
+function checkOpposedConnections()
+
+	for connectionIndex1, connection1 in ipairs(connections) do
+		for connectionIndex2, connection2 in ipairs(connections) do
+			-- work out if a connection is opposed and set opposed
+			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and connection2.opposedConnectionIndex == 0 then 
+				connection1.opposedConnectionIndex = connectionIndex2
+				connection2.opposedConnectionIndex = connectionIndex1
+				print("OPPOSED!")
+			end
+		end
+	end
+
+end
+
 
 function love.mousereleased(mouseX, mouseY)
 
@@ -223,8 +333,8 @@ function love.mousereleased(mouseX, mouseY)
 	and releasenode > 0 
 	and nodeSelected ~= releasenode   -- means not equal
 	then
+
 		local edges = calculateNodeEdges(nodeSelected, releasenode)
-		print(edges.sourceX)
 
 		local numLinksToMake = math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
 		local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
@@ -233,13 +343,48 @@ function love.mousereleased(mouseX, mouseY)
 		local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
 
 		-- connection creation with no links
-		table.insert(connections, {
-		source = nodeSelected, target = releasenode, population = nodes[nodeSelected].population, linkXStep = linkSteps.x, linkYStep = linkSteps.y, links = {}
+		table.insert(connections, {	
+			population = nodes[nodeSelected].population, team = nodes[nodeSelected].team, moving = true, source = nodeSelected, 
+			sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
+			target = releasenode,
+            targetEdge = {
+            	x = edges.targetX, 
+            	y = edges.targetY
+            },
+            tentacleEnd = {
+            	x = edges.sourceX, 
+            	y = edges.sourceY
+            },
+            connectionMidPoint = {
+            	x = 200,
+            	y = 200
+            },
+            linkXStep = linkSteps.x,
+            linkYStep = linkSteps.y,
+            links = {
+            },
+            destination = 2,
+            opposedConnectionIndex = 0
 		})
+
+
+
+
+
+		-- add to connections a "moving" boolean
+		-- it ends when function istentaclemoving() confirms
+		-- add to connections a "tentacle" X and Y
+		-- add to connections a "tentacleSource" X and Y
+		-- add to connections a "tentacleTarget" X and Y
+		-- add to connections a "tentacleMidpoint" X and Y
+		-- istentaclemoving() checks if tentacle equals tentacle target or midpoint
+
+		-- tentacleLinkPlotting()
+
 
 		-- link creation
 			--loops from 1 to number of nodes that would fit in the distance 
-		for i = 1, numLinksToMake+1 do
+		for i = 1, 1 do -- numLinksToMake+1 do
 			table.insert(connections[#connections].links, {
 				x = edges.sourceX + (connections[#connections].linkXStep*(i-1)),
 				y = edges.sourceY + (connections[#connections].linkYStep*(i-1))
@@ -313,6 +458,12 @@ function love.mousepressed(mouseX, mouseY)
 	
 	nodeSelected = isMouseInNode() 
 
+	if nodeSelected < 1 then
+		pointSelected = {x = mouseX, y = mouseY}
+	else
+		pointSelected = 0
+	end
+
 
 end
 
@@ -333,6 +484,7 @@ function love.draw(mouseX, mouseY)
 		-- also maybe need to add noderadius to start and end points? to look like how tentacle wars does it
 
 		--this part is just the connection lin to remove once proper links added
+		--love.graphics.line( nodes[connection.source].x, nodes[connection.source].y, nodes[connection.target].x, nodes[connection.target].y)
 		--[[love.graphics.line( --nodes[connection.source].x, nodes[connection.source].y,
 			(((7*nodes[connection.source].x) + (1*nodes[connection.target].x))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5), (((7*nodes[connection.source].y) + (1*nodes[connection.target].y))/8)+(((math.abs(((timer)%1)-0.5))*20)-5),
 			(((6*nodes[connection.source].x) + (2*nodes[connection.target].x))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5), (((6*nodes[connection.source].y) + (2*nodes[connection.target].y))/8)+(((math.abs(((timer+0.1)%1)-0.5))*20)-5),
@@ -352,31 +504,71 @@ function love.draw(mouseX, mouseY)
 				-- then that number is scaled up relative to the X or Y linkStep, 
 				-- the bigger the X step the more it should wobble in Y, hence the flipped X or Y step for scaling
 				-- /3 at the end so the wobble is less dramatic 
+		local prevXWobble = 0
+		local prevYWobble = 0
 		for linkIndex, link in ipairs(connection.links) do 
 			local xwobble = 0
 			local ywobble = 0
-			if linkIndex > 2 and linkIndex < #connection.links -1 then
-				xwobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkYStep/3
-				ywobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkXStep/3
+			if (linkIndex > 2 and linkIndex < #connection.links -1) or connection.moving == true then
+				xwobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkYStep/3
+				ywobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkXStep/3
 			elseif linkIndex == 2 or linkIndex == #connection.links -1 then
-				xwobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkYStep/6
-				ywobble = (math.sin(((timer+(linkIndex/6))%2)*math.pi))*connection.linkXStep/6
+				xwobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkYStep/6
+				ywobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkXStep/6
 			end
+			if connection.moving == true then
+				xwobble = 1.5*xwobble
+				ywobble = 1.5*ywobble
+			end
+
+
 			love.graphics.setColor(0.1, 0.7, 0.1)
-			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius)
+			if linkIndex == 1 then
+				love.graphics.setColor(0.1, 0.0, 0.1)
+			end
+			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
+
+
+
+			--linkWigglers
+				-- links needs to be infront of node feelers, maybe redo this loop with just this bit, after node creation
 			love.graphics.setColor(1, 1, 1)
+			if linkIndex > 1 and linkIndex < #connection.links  then
+				local linkcentre = {x = link.x-xwobble, y = link.y+ywobble}  --  this whole bits wrong, I'm basing it off the straight link-wobble lines but the point must change so that they "face different ways"
+				local prevLinkCentre = {x = connection.links[linkIndex-1].x-prevXWobble, y = connection.links[linkIndex-1].y+prevYWobble}
+
+				-- left side wigglers
+					--/1.5 = how far along the wiggler, 2 would be almost on the link and 1 would be the end of the wiggler, so this is the range
+					--/6 = how small the bend i.e. /2 is the biggest bend
+				love.graphics.line(linkcentre.x, linkcentre.y, 
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/6, linkcentre.y+(linkcentre.x - prevLinkCentre.x)/1.5+ (linkcentre.y - prevLinkCentre.y)/6,
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)+(linkcentre.x - prevLinkCentre.x)/2, linkcentre.y+(linkcentre.x - prevLinkCentre.x)+ (linkcentre.y - prevLinkCentre.y)/2) 
+
+				--right? handside link wigglers
+				-- to mirror the above once the first side looks good
+				love.graphics.line(linkcentre.x, linkcentre.y, 
+					linkcentre.x+(linkcentre.y - prevLinkCentre.y), linkcentre.y-(linkcentre.x - prevLinkCentre.x))
+
+				--[[love.graphics.line(linkcentre.x-(connection.linkYStep/3), linkcentre.y+(connection.linkXStep/3), 
+					((linkcentre.x + (connection.links[linkIndex-1].x-prevXWobble))/2-(connection.linkYStep)), (linkcentre.y + (connection.links[linkIndex-1].y+prevYWobble))/2+(connection.linkXStep))
+
+				love.graphics.line(linkcentre.x+(connection.linkYStep/3), linkcentre.y-(connection.linkXStep/3), 
+					((linkcentre.x + (connection.links[linkIndex-1].x-prevXWobble))/2+(connection.linkYStep)), (linkcentre.y + (connection.links[linkIndex-1].y+prevYWobble))/2-(connection.linkXStep))]]
+			end
+
+			-- straight link-wobble lines
+			--[[love.graphics.setColor(1, 1, 1)
 			love.graphics.line(link.x, link.y, link.x-connection.linkYStep, link.y+connection.linkXStep)
-			love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)
+			love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)]]
 			-- border
 			love.graphics.setColor(1, 1, 1)
 			love.graphics.setLineWidth( 1 )
 			love.graphics.circle('line', link.x-xwobble, link.y+ywobble, linkRadius)
+			prevXWobble = xwobble
+			prevYWobble = ywobble
 
 		end
 
-		--[[for edgeIndex, edge in ipairs(edgesTemp) do 
-			love.graphics.circle('fill', edge.x, edge.y, linkRadius)
-		end]]
 	end
 
 
@@ -413,9 +605,9 @@ function love.draw(mouseX, mouseY)
 			--rotate the whole screen centred on the node, redraw the feeler
 			love.graphics.translate(node.x, node.y)
 			love.graphics.rotate(math.pi/4)
-			love.graphics.translate(-node.x, -node.y)
+			love.graphics.translate(-node.x, -node.y) -- I think this sets the origin back to 0,0 but with everything now rotated
 		end
-		-- reset origin
+		-- unrotates and resets origin
 		love.graphics.origin()
 
 		-- draw population number
@@ -425,11 +617,21 @@ function love.draw(mouseX, mouseY)
 	end
 
 	
-	-- draw line between mouse and NODE after node selected
+	-- draw line between mouse and NODE after node selected, before release
 	love.graphics.setColor(0.8, 0.8, 0)
-	if love.mouse.isDown(1) and nodeSelected > 0 then
-		love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
-		love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
+	if love.mouse.isDown(1) then
+		if nodeSelected > 0 and pointSelected == 0 then
+			love.graphics.setColor(0.8, 0.8, 0)
+			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
+			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
+		else
+			love.graphics.setColor(0.8, 0, 0)
+			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
+		end
+
+		
+	else
+
 	end
 
 end
