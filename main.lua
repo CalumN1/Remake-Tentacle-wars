@@ -17,10 +17,10 @@ function love.load()
     font20 = love.graphics.newFont(20)
     font28 = love.graphics.newFont(28)
 
-	nodeRadius = 40  -- outer ring
+	nodeRadius = 36  -- outer ring
 
 	linkRadius = 8
-	linkSpacing = 6
+	linkSpacing = 8
 
 
     nodeSelected = 0
@@ -36,7 +36,7 @@ function love.load()
         {
             x = arenaWidth / 3,
             y = 100,
-            team = 1,
+            team = 2,
             population = 30,
             tier = 1,
             regenDelay = 5,
@@ -45,7 +45,7 @@ function love.load()
         {
             x = arenaWidth / 1.5, 
             y = 100,
-            team = 0,
+            team = 1,
             population = 10,
             tier = 1,
             regenDelay = 5,
@@ -54,7 +54,7 @@ function love.load()
         {
             x = 100,
             y = nodeMapHeight - 200,
-            team = 0,
+            team = 1,
             population = 50,
             tier = 1,
             regenDelay = 5,
@@ -63,7 +63,7 @@ function love.load()
         {
             x = arenaWidth / 2,
             y = nodeMapHeight - 100,
-            team = 2,
+            team = 3,
             population = 3,
             tier = 1,
             regenDelay = 5,
@@ -72,7 +72,7 @@ function love.load()
         {
             x = arenaWidth - 100,
             y = nodeMapHeight - 200,
-            team = 2,
+            team = 3,
             population = 30,
             tier = 1,
             regenDelay = 5,
@@ -114,6 +114,12 @@ function love.load()
             destination = 2,
         	opposedConnectionIndex = 0 -- 0 means no opposed connection
         }
+    }
+
+    teamColours = {
+    	{0.7, 0.7, 0.7},
+    	{0.1, 0.7, 0.1},
+    	{0.7, 0.2, 0.2}
     }
 
 
@@ -384,6 +390,8 @@ function love.mousereleased(mouseX, mouseY)
 
 		-- link creation
 			--loops from 1 to number of nodes that would fit in the distance 
+
+		-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
 		for i = 1, 1 do -- numLinksToMake+1 do
 			table.insert(connections[#connections].links, {
 				x = edges.sourceX + (connections[#connections].linkXStep*(i-1)),
@@ -504,17 +512,19 @@ function love.draw(mouseX, mouseY)
 				-- then that number is scaled up relative to the X or Y linkStep, 
 				-- the bigger the X step the more it should wobble in Y, hence the flipped X or Y step for scaling
 				-- /3 at the end so the wobble is less dramatic 
+				-- first divide (/15) determines the difference between each link and therefore wavelength
+				-- % mod determines wobble speed, frequency?
 		local prevXWobble = 0
 		local prevYWobble = 0
 		for linkIndex, link in ipairs(connection.links) do 
 			local xwobble = 0
 			local ywobble = 0
 			if (linkIndex > 2 and linkIndex < #connection.links -1) or connection.moving == true then
-				xwobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkYStep/3
-				ywobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkXStep/3
+				xwobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
+				ywobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
 			elseif linkIndex == 2 or linkIndex == #connection.links -1 then
-				xwobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkYStep/6
-				ywobble = (math.sin(((timer-(linkIndex/6))%2)*math.pi))*connection.linkXStep/6
+				xwobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
+				ywobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
 			end
 			if connection.moving == true then
 				xwobble = 1.5*xwobble
@@ -522,11 +532,13 @@ function love.draw(mouseX, mouseY)
 			end
 
 
-			love.graphics.setColor(0.1, 0.7, 0.1)
+			love.graphics.setColor(teamColours[connection.team])
 			if linkIndex == 1 then
 				love.graphics.setColor(0.1, 0.0, 0.1)
 			end
-			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
+			love.graphics.setColor(teamColours[connection.team])
+			--link
+			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius-2)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
 
 
 
@@ -538,22 +550,38 @@ function love.draw(mouseX, mouseY)
 				local prevLinkCentre = {x = connection.links[linkIndex-1].x-prevXWobble, y = connection.links[linkIndex-1].y+prevYWobble}
 
 				-- left side wigglers
-					--/1.5 = how far along the wiggler, 2 would be almost on the link and 1 would be the end of the wiggler, so this is the range
-					--/6 = how small the bend i.e. /2 is the biggest bend
-				love.graphics.line(linkcentre.x, linkcentre.y, 
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/6, linkcentre.y+(linkcentre.x - prevLinkCentre.x)/1.5+ (linkcentre.y - prevLinkCentre.y)/6,
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)+(linkcentre.x - prevLinkCentre.x)/2, linkcentre.y+(linkcentre.x - prevLinkCentre.x)+ (linkcentre.y - prevLinkCentre.y)/2) 
+					--first div = how far along the wiggler, 3 would be almost on the link and 1 would be the end of the wiggler, so this is the range
+					--second div = how small the bend i.e. /2 is the biggest bend
+					-- todo: make the wigglers actually wiggle themselves and make the bend look curved at all times of the wiggle
+
+					-- ((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.1)
+				love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/3.5, 
+					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/3.5,
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/5, 
+					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/5)
+				love.graphics.setColor(teamColours[connection.team+1])
+				love.graphics.line(linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/5, 
+					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/5,
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2+ (linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+2), 
+					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2+ (linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+2),
+					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+1), 
+					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/1.5+(linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+1)) 
 
 				--right? handside link wigglers
 				-- to mirror the above once the first side looks good
 				love.graphics.line(linkcentre.x, linkcentre.y, 
 					linkcentre.x+(linkcentre.y - prevLinkCentre.y), linkcentre.y-(linkcentre.x - prevLinkCentre.x))
 
-				--[[love.graphics.line(linkcentre.x-(connection.linkYStep/3), linkcentre.y+(connection.linkXStep/3), 
-					((linkcentre.x + (connection.links[linkIndex-1].x-prevXWobble))/2-(connection.linkYStep)), (linkcentre.y + (connection.links[linkIndex-1].y+prevYWobble))/2+(connection.linkXStep))
-
-				love.graphics.line(linkcentre.x+(connection.linkYStep/3), linkcentre.y-(connection.linkXStep/3), 
-					((linkcentre.x + (connection.links[linkIndex-1].x-prevXWobble))/2+(connection.linkYStep)), (linkcentre.y + (connection.links[linkIndex-1].y+prevYWobble))/2-(connection.linkXStep))]]
+				--[[love.graphics.line(-- linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/3.5, linkcentre.y-(linkcentre.x - prevLinkCentre.x)/3.5,
+					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/3, 
+					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/3,
+					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/2+ (linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+2), 
+					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/2+ (linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+2),
+					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+1), 
+					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/1.5+(linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+1)) 
+]]
 			end
 
 			-- straight link-wobble lines
@@ -562,7 +590,7 @@ function love.draw(mouseX, mouseY)
 			love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)]]
 			-- border
 			love.graphics.setColor(1, 1, 1)
-			love.graphics.setLineWidth( 1 )
+			love.graphics.setLineWidth( 2 )
 			love.graphics.circle('line', link.x-xwobble, link.y+ywobble, linkRadius)
 			prevXWobble = xwobble
 			prevYWobble = ywobble
@@ -575,7 +603,7 @@ function love.draw(mouseX, mouseY)
 	-- draw all nodes and population number
 	for nodeIndex, node in ipairs(nodes) do
 		-- draw node depending on team colour
-		if node.team == 0 then
+		--[[if node.team == 0 then
 			love.graphics.setColor(0.7, 0.7, 0.7)
 		elseif node.team == 1 then
 		    love.graphics.setColor(0.1, 0.7, 0.1)
@@ -583,9 +611,10 @@ function love.draw(mouseX, mouseY)
 		    love.graphics.setColor(0.7, 0.2, 0.2)
 		else
 			love.graphics.setColor(1, 1, 1)
-		end
+		end]]
+		love.graphics.setColor(teamColours[node.team])
 		-- draw node
-		-- love.graphics.circle('fill', node.x, node.y, nodeRadius-10)
+		love.graphics.circle('fill', node.x, node.y, nodeRadius-10)
 		-- border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
@@ -597,10 +626,10 @@ function love.draw(mouseX, mouseY)
 	 	love.graphics.setLineWidth( 1 )
 	 	for i = 1, 8 do
 			love.graphics.line(node.x, node.y-(nodeRadius), 
-				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.1), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.25),
-				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.3), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.5),
-				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.6), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*0.75),
-				node.x+((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*1), node.y-(nodeRadius+10)-((20+((math.sin(((timer%5)/5)*math.pi))*4)-2)*1))
+				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeRadius)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
+				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeRadius)-5+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
+				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.5), node.y-(nodeRadius)-10+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.5),
+				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*1), node.y-(nodeRadius)-15+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1))
 
 			--rotate the whole screen centred on the node, redraw the feeler
 			love.graphics.translate(node.x, node.y)
