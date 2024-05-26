@@ -518,9 +518,11 @@ end
 function love.draw(mouseX, mouseY)
 
 
+
 	love.graphics.setFont(font20)
 
-	
+	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 10)
+
 
 	-- draw line between linked nodes
 	-- this is first so its underneath nodes
@@ -566,34 +568,37 @@ function love.draw(mouseX, mouseY)
 					-- links needs to be infront of node feelers, maybe redo this loop with just this bit, after node creation
 				love.graphics.setColor(1, 1, 1)
 				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
-					local nextLinkCentre = {x = connection.links[Index+1].x-nextXWobble, y = connection.links[Index+1].y+nextYWobble}  
-					local linkCentre = {x = connection.links[Index].x-xWobble, y = connection.links[Index].y+yWobble}
 
-					local angleFromY = calculateSourceYAngleAny(nextLinkCentre,linkCentre)
-					local wigglerShrink = 1
 
 					local linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
 					local linkToSourceDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.sourceEdge.x, connection.sourceEdge.y) 
+
 					if connection.moving == true and linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then -- 108 to 0 away, 2 was 59
 						--reduce wobble when close, to avoid lock on jump
-						
 						print(linkToTargetDist)
 						xWobble = xWobble*linkToTargetDist/108
 						yWobble = yWobble*linkToTargetDist/108
 					end
 
+					local wigglerShrink = 1
 					if linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
 						wigglerShrink = (linkToTargetDist/108) * (linkToTargetDist/108)
 					elseif linkToSourceDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
 						wigglerShrink = (linkToSourceDist/108) * (linkToSourceDist/108)
 					end
 
-					
-				
 					if (wigglerShrink < 0.14) then
 						--print("tiny")
 						wigglerShrink = 0.14
 					end
+
+
+					local nextLinkCentre = {x = connection.links[Index+1].x-nextXWobble, y = connection.links[Index+1].y+nextYWobble}  
+					local linkCentre = {x = connection.links[Index].x-xWobble, y = connection.links[Index].y+yWobble}
+					local angleFromY = calculateSourceYAngleAny(nextLinkCentre,linkCentre)
+					
+				
+					
 
 					-- left side wigglers
 						--first div = how far along the wiggler, 3 would be almost on the link and 1 would be the end of the wiggler, so this is the range
@@ -609,6 +614,8 @@ function love.draw(mouseX, mouseY)
 						--print(wigglerShrink)
 						--love.graphics.setColor(1,1,0)
 					end
+
+
 					love.graphics.setLineWidth( 1 )
 					love.graphics.translate(linkCentre.x, linkCentre.y)
 					love.graphics.rotate(-angleFromY)
@@ -689,12 +696,12 @@ function love.draw(mouseX, mouseY)
 				end
 				love.graphics.setColor(teamColours[connection.team])
 				--link
-				love.graphics.circle('fill', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius-3)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
+				love.graphics.circle('fill', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius-2)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
 
 
-				-- border
+				-- link border
 				love.graphics.setColor(1, 1, 1)
-				love.graphics.setLineWidth( 2 )
+				love.graphics.setLineWidth( 1 )
 				love.graphics.circle('line', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius)
 
 
@@ -761,7 +768,8 @@ function love.draw(mouseX, mouseY)
 		else
 			love.graphics.setColor(0.8, 0, 0)
 			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
-			print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
+			--get angle of red line
+			--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
 		end
 
 		
