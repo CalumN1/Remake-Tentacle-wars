@@ -2,6 +2,11 @@ io.stdout:setvbuf('no')
 
 -- require "cards"  -- separate file, do this for each seperate file, not conf or main tho
 
+--https://love2d.org/wiki/Optimising
+
+
+-- This function gets called only once, when the game is started, and is usually where you would load resources, initialize variables and set specific settings. 
+-- All those things can be done anywhere else as well, but doing them here means that they are done once only, saving a lot of system resources
 function love.load()
 	arenaWidth = 1200
     arenaHeight = 900 -- changing this doesnt do anything? need to at least change conf file too
@@ -19,8 +24,8 @@ function love.load()
 
 	nodeRadius = 36  -- outer ring
 
-	linkRadius = 8
-	linkSpacing = 8
+	linkRadius = 7
+	linkSpacing = 12
 
 
     nodeSelected = 0
@@ -71,9 +76,9 @@ function love.load()
         },
         {
             x = arenaWidth - 100,
-            y = nodeMapHeight - 200,
+            y = nodeMapHeight - 600,
             team = 3,
-            population = 30,
+            population = 50,
             tier = 1,
             regenDelay = 5,
             regenTimer = 5
@@ -112,7 +117,7 @@ function love.load()
             	}
             },
             destination = 2,
-        	opposedConnectionIndex = 0 -- 0 means no opposed connection
+        	opposedConnectionIndex = 0, -- 0 means no opposed connection
         }
     }
 
@@ -157,6 +162,37 @@ function calculateSteps(x1,y1,x2,y2, extraSpacing)
 
 	return {x = xStep, y = yStep}
 
+
+end
+
+
+function calculateSourceYAngleAny(source, target)
+
+	local longXOpposite = (source.x - target.x )
+	local longYAdjacent = (source.y - target.y )
+
+	local sourceAngle = math.atan(longXOpposite/longYAdjacent)+math.pi/2
+
+	if longYAdjacent < 0 then
+		sourceAngle = sourceAngle + math.pi
+	end
+
+	return sourceAngle
+
+end
+
+function calculateSourceYAngle(sourceNode, targetNode)
+
+	local longXOpposite = (nodes[sourceNode].x - nodes[targetNode].x ) --this is the difference between above and  this, this one is for nodes: nodes[target] 
+	local longYAdjacent = (nodes[sourceNode].y - nodes[targetNode].y )
+
+	local sourceAngle = math.atan(longXOpposite/longYAdjacent)+math.pi/2
+
+	if longYAdjacent < 0 then
+		sourceAngle = sourceAngle + math.pi
+	end
+
+	return sourceAngle
 
 end
 
@@ -348,6 +384,8 @@ function love.mousereleased(mouseX, mouseY)
 
 		local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
 
+		print(calculateSourceYAngle(nodeSelected, releasenode))
+
 		-- connection creation with no links
 		table.insert(connections, {	
 			population = nodes[nodeSelected].population, team = nodes[nodeSelected].team, moving = true, source = nodeSelected, 
@@ -482,6 +520,8 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.setFont(font20)
 
+	
+
 	-- draw line between linked nodes
 	-- this is first so its underneath nodes
 	
@@ -491,21 +531,6 @@ function love.draw(mouseX, mouseY)
 		-- to do: draw a circle at each of these points below then can have the colour change to show flow, and create a loop so size can vary
 		-- also maybe need to add noderadius to start and end points? to look like how tentacle wars does it
 
-		--this part is just the connection lin to remove once proper links added
-		--love.graphics.line( nodes[connection.source].x, nodes[connection.source].y, nodes[connection.target].x, nodes[connection.target].y)
-		--[[love.graphics.line( --nodes[connection.source].x, nodes[connection.source].y,
-			(((7*nodes[connection.source].x) + (1*nodes[connection.target].x))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5), (((7*nodes[connection.source].y) + (1*nodes[connection.target].y))/8)+(((math.abs(((timer)%1)-0.5))*20)-5),
-			(((6*nodes[connection.source].x) + (2*nodes[connection.target].x))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5), (((6*nodes[connection.source].y) + (2*nodes[connection.target].y))/8)+(((math.abs(((timer+0.1)%1)-0.5))*20)-5),
-			(((5*nodes[connection.source].x) + (3*nodes[connection.target].x))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5), (((5*nodes[connection.source].y) + (3*nodes[connection.target].y))/8)+(((math.abs(((timer+0.2)%1)-0.5))*20)-5),
-			(((4*nodes[connection.source].x) + (4*nodes[connection.target].x))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5), (((4*nodes[connection.source].y) + (4*nodes[connection.target].y))/8)+(((math.abs(((timer+0.3)%1)-0.5))*20)-5),
-			(((3*nodes[connection.source].x) + (5*nodes[connection.target].x))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5), (((3*nodes[connection.source].y) + (5*nodes[connection.target].y))/8)+(((math.abs(((timer+0.4)%1)-0.5))*20)-5),
-			(((2*nodes[connection.source].x) + (6*nodes[connection.target].x))/8)+(((math.abs(((timer+0.7)%1)-0.5))*20)-5), (((2*nodes[connection.source].y) + (6*nodes[connection.target].y))/8)+(((math.abs(((timer+0.5)%1)-0.5))*20)-5),
-			(((1*nodes[connection.source].x) + (7*nodes[connection.target].x))/8)+(((math.abs(((timer+0.8)%1)-0.5))*20)-5), (((1*nodes[connection.source].y) + (7*nodes[connection.target].y))/8)+(((math.abs(((timer+0.6)%1)-0.5))*20)-5)
-
-
-			)]]
-			--nodes[connection.target].x, nodes[connection.target].y)
-
 		-- link making and wobble:
 				-- ((timer%2)*math.pi)  > this moves smoothly and linearly from 0 to 359.9
 				-- the sin of that varies non linearly, like a sin wave from 0 to 1 to -1 to 0
@@ -514,89 +539,169 @@ function love.draw(mouseX, mouseY)
 				-- /3 at the end so the wobble is less dramatic 
 				-- first divide (/15) determines the difference between each link and therefore wavelength
 				-- % mod determines wobble speed, frequency?
-		local prevXWobble = 0
-		local prevYWobble = 0
-		for linkIndex, link in ipairs(connection.links) do 
-			local xwobble = 0
-			local ywobble = 0
-			if (linkIndex > 2 and linkIndex < #connection.links -1) or connection.moving == true then
-				xwobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
-				ywobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
-			elseif linkIndex == 2 or linkIndex == #connection.links -1 then
-				xwobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
-				ywobble = (math.sin(((timer-(linkIndex/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
-			end
-			if connection.moving == true then
-				xwobble = 1.5*xwobble
-				ywobble = 1.5*ywobble
+		local xWobble = 0
+		local yWobble = 0
+		for Index = 0, #connection.links  do
+		
+			-- this is a bit wierd, the first loop through creates the next wobble i.e. for link 1, then the next loop we set "next wobble" to current wobble and create the next wobble for link 2 then give link 1 the current wobble 
+			local nextXWobble = 0
+			local nextYWobble = 0
+			if (Index+1 > 2 and Index < #connection.links -2) or connection.moving == true then
+				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
+				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
+			elseif Index+1 == 2 or Index == #connection.links -2 then
+				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
+				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
 			end
 
+			--bigger wobble when moving?
+			--[[if connection.moving == true then
+				nextXWobble = 1.5*nextXWobble
+				nextYWobble = 1.5*nextYWobble
+			end]]
 
-			love.graphics.setColor(teamColours[connection.team])
-			if linkIndex == 1 then
-				love.graphics.setColor(0.1, 0.0, 0.1)
+			if Index > 0 then
+				
+				--linkWigglers
+					-- links needs to be infront of node feelers, maybe redo this loop with just this bit, after node creation
+				love.graphics.setColor(1, 1, 1)
+				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
+					local nextLinkCentre = {x = connection.links[Index+1].x-nextXWobble, y = connection.links[Index+1].y+nextYWobble}  
+					local linkCentre = {x = connection.links[Index].x-xWobble, y = connection.links[Index].y+yWobble}
+
+					local angleFromY = calculateSourceYAngleAny(nextLinkCentre,linkCentre)
+					local wigglerShrink = 1
+
+					local linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
+					local linkToSourceDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.sourceEdge.x, connection.sourceEdge.y) 
+					if connection.moving == true and linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then -- 108 to 0 away, 2 was 59
+						--reduce wobble when close, to avoid lock on jump
+						
+						print(linkToTargetDist)
+						xWobble = xWobble*linkToTargetDist/108
+						yWobble = yWobble*linkToTargetDist/108
+					end
+
+					if linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
+						wigglerShrink = (linkToTargetDist/108) * (linkToTargetDist/108)
+					elseif linkToSourceDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
+						wigglerShrink = (linkToSourceDist/108) * (linkToSourceDist/108)
+					end
+
+					
+				
+					if (wigglerShrink < 0.14) then
+						--print("tiny")
+						wigglerShrink = 0.14
+					end
+
+					-- left side wigglers
+						--first div = how far along the wiggler, 3 would be almost on the link and 1 would be the end of the wiggler, so this is the range
+						--second div = how small the bend i.e. /2 is the biggest bend
+						-- todo: make the wigglers actually wiggle themselves and make the bend look curved at all times of the wiggle
+
+
+
+					--Try 3
+					love.graphics.setColor(1,1,1)
+
+					if wigglerShrink < 1 then
+						--print(wigglerShrink)
+						--love.graphics.setColor(1,1,0)
+					end
+					love.graphics.setLineWidth( 1 )
+					love.graphics.translate(linkCentre.x, linkCentre.y)
+					love.graphics.rotate(-angleFromY)
+
+					love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+						-linkRadius/2, 
+						-linkRadius/1.15,
+						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
+
+					love.graphics.line( -5 +(((math.cos(((math.abs(timer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),
+
+						---20+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						--6-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4),
+
+						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
+					--first div is what makes wobble 1.6 to 2.5 ish
+					--last div wobble between 2 and 1.2
+
+					
+					-- print(connection.angleFromY)
+					love.graphics.scale(1,-1)
+					--love.graphics.rotate(connection.angleFromY*math.pi/360)
+					--linkcentre.x = linkcentre.x*2
+					--linkcentre.y = linkcentre.y*2
+
+					love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+						-linkRadius/2, 
+						-linkRadius/1.15,
+						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
+					--love.graphics.setColor(teamColours[connection.team-1]) --green
+					love.graphics.line( -5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),	
+						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
+
+					-- before rotation
+					--[[love.graphics.line( -10 +(((math.sin(((math.abs(timer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.2), 
+						-(1.8*linkRadius)+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*1))*2.),
+						(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*1.2), 
+						-(3*linkRadius)+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*1))*2.5))]]
+
+					--linkcentre.x = linkcentre.x/2
+					love.graphics.scale(1,-1)
+					love.graphics.rotate(angleFromY)
+					love.graphics.translate(-linkCentre.x, -linkCentre.y)
+
+
+					-- -1 to 1
+					--  1.6+ (math.sin(((timer+1/3)%0.8)*2.5*math.pi))/2
+
+					--right? handside link wigglers
+					-- to mirror the above once the first side looks good
+
+					--love.graphics.line(linkcentre.x, linkcentre.y, 
+					--	linkcentre.x+(linkcentre.y - prevLinkCentre.y), linkcentre.y-(linkcentre.x - prevLinkCentre.x))
+
+					--love.graphics.setColor(teamColours[connection.team-1]) --green
+
+					--[[love.graphics.line(linkcentre.x, linkcentre.y - linkRadius,
+						linkcentre.x+(((math.sin(((timer)%1.6)*1.25*math.pi)*5))*10), 
+						linkcentre.y-(30*linkRadius)+(((math.sin(((timer)%1.6)*1.25*math.pi)*1))*10))]]
+
+				end
+
+				-- straight link-wobble lines
+				--[[love.graphics.setColor(1, 1, 1)
+				love.graphics.line(link.x, link.y, link.x-connection.linkYStep, link.y+connection.linkXStep)
+				love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)]]
+
+
+				love.graphics.setColor(teamColours[connection.team])
+				if Index == 1 then
+					love.graphics.setColor(0.1, 0.0, 0.1)
+				end
+				love.graphics.setColor(teamColours[connection.team])
+				--link
+				love.graphics.circle('fill', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius-3)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
+
+
+				-- border
+				love.graphics.setColor(1, 1, 1)
+				love.graphics.setLineWidth( 2 )
+				love.graphics.circle('line', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius)
+
+
 			end
-			love.graphics.setColor(teamColours[connection.team])
-			--link
-			love.graphics.circle('fill', link.x-xwobble, link.y+ywobble, linkRadius-2)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
-
-
-
-			--linkWigglers
-				-- links needs to be infront of node feelers, maybe redo this loop with just this bit, after node creation
-			love.graphics.setColor(1, 1, 1)
-			if linkIndex > 1 and linkIndex < #connection.links  then
-				local linkcentre = {x = link.x-xwobble, y = link.y+ywobble}  --  this whole bits wrong, I'm basing it off the straight link-wobble lines but the point must change so that they "face different ways"
-				local prevLinkCentre = {x = connection.links[linkIndex-1].x-prevXWobble, y = connection.links[linkIndex-1].y+prevYWobble}
-
-				-- left side wigglers
-					--first div = how far along the wiggler, 3 would be almost on the link and 1 would be the end of the wiggler, so this is the range
-					--second div = how small the bend i.e. /2 is the biggest bend
-					-- todo: make the wigglers actually wiggle themselves and make the bend look curved at all times of the wiggle
-
-					-- ((((math.abs(((timer+i/3)%1.5)-0.75))*10)-5)*0.1)
-				love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/3.5, 
-					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/3.5,
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/5, 
-					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/5)
-				love.graphics.setColor(teamColours[connection.team+1])
-				love.graphics.line(linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/5, 
-					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/5,
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/2+ (linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+2), 
-					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/2+ (linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+2),
-					linkcentre.x-(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+1), 
-					linkcentre.y+(linkcentre.x - prevLinkCentre.x)/1.5+(linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*5)+1)) 
-
-				--right? handside link wigglers
-				-- to mirror the above once the first side looks good
-				love.graphics.line(linkcentre.x, linkcentre.y, 
-					linkcentre.x+(linkcentre.y - prevLinkCentre.y), linkcentre.y-(linkcentre.x - prevLinkCentre.x))
-
-				--[[love.graphics.line(-- linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
-					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/3.5, linkcentre.y-(linkcentre.x - prevLinkCentre.x)/3.5,
-					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/2.5+(linkcentre.x - prevLinkCentre.x)/3, 
-					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/2.5+(linkcentre.y - prevLinkCentre.y)/3,
-					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/2+ (linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+2), 
-					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/2+ (linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+2),
-					linkcentre.x+(linkcentre.y - prevLinkCentre.y)/1.5+(linkcentre.x - prevLinkCentre.x)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+1), 
-					linkcentre.y-(linkcentre.x - prevLinkCentre.x)/1.5+(linkcentre.y - prevLinkCentre.y)/(((math.abs(((timer+1/3)%0.8)-0.4))*10)+1)) 
-]]
-			end
-
-			-- straight link-wobble lines
-			--[[love.graphics.setColor(1, 1, 1)
-			love.graphics.line(link.x, link.y, link.x-connection.linkYStep, link.y+connection.linkXStep)
-			love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)]]
-			-- border
-			love.graphics.setColor(1, 1, 1)
-			love.graphics.setLineWidth( 2 )
-			love.graphics.circle('line', link.x-xwobble, link.y+ywobble, linkRadius)
-			prevXWobble = xwobble
-			prevYWobble = ywobble
-
+			xWobble = nextXWobble
+			yWobble = nextYWobble
 		end
-
 	end
 
 
@@ -656,6 +761,7 @@ function love.draw(mouseX, mouseY)
 		else
 			love.graphics.setColor(0.8, 0, 0)
 			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
+			print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
 		end
 
 		
