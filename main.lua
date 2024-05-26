@@ -25,11 +25,11 @@ function love.load()
 	nodeRadius = 36  -- outer ring
 
 	linkRadius = 7
-	linkSpacing = 12
+	linkSpacing = 10
 
 
     nodeSelected = 0
-    pointSelected = {}
+    pointSelected = 0
 
     cutSource = {
     	--x = 5
@@ -118,6 +118,7 @@ function love.load()
             },
             destination = 2,
         	opposedConnectionIndex = 0, -- 0 means no opposed connection
+        	splitLink = 0
         }
     }
 
@@ -151,6 +152,41 @@ function distancebetween(x1,y1,x2,y2)
 	return math.sqrt((x1 - x2)^2 + (y1 - y2)^2)
 
 end
+
+
+function findIntersectionPoint(x1, y1, x2, y2, x3, y3, x4, y4)
+    -- Calculate the differences
+    local dx1 = x2 - x1
+    local dy1 = y2 - y1
+    local dx2 = x4 - x3
+    local dy2 = y4 - y3
+    
+    -- Calculate the determinants
+    local det = dx1 * dy2 - dy1 * dx2
+    
+    -- If the determinant is zero, the lines are parallel
+    if det == 0 then
+        return nil, nil -- No intersection
+    end
+    
+    -- Calculate the parameters for the intersection point
+    local u = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / det
+    local v = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / det
+    
+    -- Check if the intersection point is within both line segments
+    if u < 0 or u > 1 or v < 0 or v > 1 then
+        return nil, nil -- No intersection within the bounds of the segments
+    end
+    
+    -- Calculate the intersection point
+    local ix = x1 + u * dx1
+    local iy = y1 + u * dy1
+    
+    return ix, iy
+end
+
+
+
 
 function calculateSteps(x1,y1,x2,y2, extraSpacing)
 	-- ratio of lengths: source to point vs source to end
@@ -210,8 +246,6 @@ function calculateNodeEdges(sourceNode, targetNode)
 	local shortHypot = nodeRadius
 	local shortXOpposite = shortHypot * math.sin(sourceAngle)
 	local shortYAdjacent = shortHypot * math.cos(sourceAngle)
-
-	print(shortYOpposite)
 
 	-- source
 	if (nodes[sourceNode].x < nodes[targetNode].x) then
@@ -277,6 +311,8 @@ end
 
 function updateMovingConnections()
 
+	tentacleEnd = connections[#connections].links[1]
+
 	for connectionIndex, connection in ipairs(connections) do
 		if connection.moving == true then
 			-- breaking a connection
@@ -331,8 +367,43 @@ function updateMovingConnections()
 
 				-- reached target?
 				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
-				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeRadius then
+				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeRadius+2 then
 					connection.moving = false
+				end
+
+			-- connection has been split, and splitLink is defined
+			elseif connection.destination == 3 then
+				for linkIndex, link in ipairs(connection.links) do
+					if linkIndex > connection.splitLink then --send to source
+						link.x = link.x - (connection.linkXStep/7)
+						link.y = link.y - (connection.linkYStep/7)
+						if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+							table.remove(connection.links, linkIndex)
+							nodes[connection.source].population = nodes[connection.source].population + 1
+						end
+					else --send to target
+						link.x = link.x + (connection.linkXStep/7)
+						link.y = link.y + (connection.linkYStep/7)
+						if distancebetween(link.x, link.y, nodes[connection.target].x, nodes[connection.target].y) < nodeRadius-linkRadius then
+							table.remove(connection.links, linkIndex)
+							connection.splitLink = connection.splitLink -1
+							if nodes[connection.target].team == connection.team then
+								nodes[connection.target].population = nodes[connection.target].population + 1
+							else
+								nodes[connection.target].population = nodes[connection.target].population - 1
+								if nodes[connection.target].population < 0 then
+									nodes[connection.target].team = connection.team 
+									nodes[connection.target].population = math.abs(nodes[connection.target].population)
+								end
+							end
+						end
+					end
+					if #connection.links == 0 then  -- couldn't used tentacle end point
+						connection.moving = false
+
+						--nodes[connection.source].population = nodes[connection.source].population - 1
+						table.remove(connections, connectionIndex)
+					end
 				end
 
 
@@ -359,11 +430,29 @@ function checkOpposedConnections()
 				connection1.opposedConnectionIndex = connectionIndex2
 				connection2.opposedConnectionIndex = connectionIndex1
 				print("OPPOSED!")
+
+				connection1.destination = 1
+				connection2.destination = 1
+
 			end
 		end
 	end
 
 end
+
+
+
+function splitTentacle(connectionIndex, ix, iy)
+
+	local connection = connections[connectionIndex]
+
+	local ratio = distancebetween(connection.sourceEdge.x, connection.sourceEdge.y, ix, iy) / 
+	distancebetween(connection.sourceEdge.x, connection.sourceEdge.y, connection.targetEdge.x, connection.targetEdge.y)
+
+	connection.splitLink = #connection.links - math.floor(#connection.links * ratio +0.5)-1
+
+end
+
 
 
 function love.mousereleased(mouseX, mouseY)
@@ -374,17 +463,18 @@ function love.mousereleased(mouseX, mouseY)
 	if nodeSelected > 0 
 	and releasenode > 0 
 	and nodeSelected ~= releasenode   -- means not equal
+	and nodes[nodeSelected].population > 0
 	then
 
 		local edges = calculateNodeEdges(nodeSelected, releasenode)
 
-		local numLinksToMake = math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
+		local numLinksToMake = 1+ math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
 		local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
 		extraSpacing = extraSpacing/numLinksToMake
 
 		local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
 
-		print(calculateSourceYAngle(nodeSelected, releasenode))
+		--print(calculateSourceYAngle(nodeSelected, releasenode))
 
 		-- connection creation with no links
 		table.insert(connections, {	
@@ -408,41 +498,61 @@ function love.mousereleased(mouseX, mouseY)
             links = {
             },
             destination = 2,
-            opposedConnectionIndex = 0
+            opposedConnectionIndex = 0,
+            splitLink = 0
 		})
-
-
-
-
-
-		-- add to connections a "moving" boolean
-		-- it ends when function istentaclemoving() confirms
-		-- add to connections a "tentacle" X and Y
-		-- add to connections a "tentacleSource" X and Y
-		-- add to connections a "tentacleTarget" X and Y
-		-- add to connections a "tentacleMidpoint" X and Y
-		-- istentaclemoving() checks if tentacle equals tentacle target or midpoint
-
-		-- tentacleLinkPlotting()
 
 
 		-- link creation
 			--loops from 1 to number of nodes that would fit in the distance 
 
 		-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
-		for i = 1, 1 do -- numLinksToMake+1 do
-			table.insert(connections[#connections].links, {
-				x = edges.sourceX + (connections[#connections].linkXStep*(i-1)),
-				y = edges.sourceY + (connections[#connections].linkYStep*(i-1))
-			})
-		end
+		--for i = 1, 1 do numLinksToMake+1 do
+
+
+		table.insert(connections[#connections].links, {
+			x = edges.sourceX,
+			y = edges.sourceY
+		})
+		nodes[nodeSelected].population = nodes[nodeSelected].population -1
+		--end
+
+		tentacleEnd = connections[#connections].links[1]
 		
 		-- print every current connection
 		for connectionIndex, connection in ipairs(connections) do
 			print(connection.source, " -> ", connection.target)
 		end
 		print(" ------------------- ")
-	
+
+
+	-- cutting a connection
+	elseif (nodeSelected == 0 and pointSelected ~= 0) then
+		-- check every connection for intersection
+		for connectionIndex, connection in ipairs(connections) do 
+			ix, iy = findIntersectionPoint(connection.sourceEdge.x,connection.sourceEdge.y, connection.targetEdge.x,connection.targetEdge.y, pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
+			if ix ~= nil and iy ~= nil then
+				love.graphics.circle('line', ix, iy, linkRadius)
+				
+				if (connection.destination < 2 or connection.moving == true) and connection.destination ~= 3  then
+					connection.destination = 0
+				else
+					connection.destination = 3 
+					splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
+					nodes[connection.target].population = nodes[connection.target].population + 1
+					
+					if distancebetween(connection.links[connection.splitLink+1].x, connection.links[connection.splitLink+1].y, connection.sourceEdge.x, connection.sourceEdge.y) < 
+						distancebetween(connection.links[connection.splitLink+1].x, connection.links[connection.splitLink+1].y, connection.targetEdge.x, connection.targetEdge.y) then
+						nodes[connection.target].population = nodes[connection.target].population - 1
+					else
+						nodes[connection.source].population = nodes[connection.source].population - 1
+					end
+				end
+
+				connection.moving = true --this triggers everything to start processing this tentacle again till resolved
+
+			end
+		end
 	end
 end
 
@@ -521,7 +631,7 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.setFont(font20)
 
-	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 10)
+	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)
 
 
 	-- draw line between linked nodes
@@ -543,6 +653,7 @@ function love.draw(mouseX, mouseY)
 				-- % mod determines wobble speed, frequency?
 		local xWobble = 0
 		local yWobble = 0
+		--this is a link loop its just weird, starting early and calculating for the one ahead, to be assigned next loop, needed for link wiggler point direction
 		for Index = 0, #connection.links  do
 		
 			-- this is a bit wierd, the first loop through creates the next wobble i.e. for link 1, then the next loop we set "next wobble" to current wobble and create the next wobble for link 2 then give link 1 the current wobble 
@@ -575,7 +686,6 @@ function love.draw(mouseX, mouseY)
 
 					if connection.moving == true and linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then -- 108 to 0 away, 2 was 59
 						--reduce wobble when close, to avoid lock on jump
-						print(linkToTargetDist)
 						xWobble = xWobble*linkToTargetDist/108
 						yWobble = yWobble*linkToTargetDist/108
 					end
@@ -588,7 +698,6 @@ function love.draw(mouseX, mouseY)
 					end
 
 					if (wigglerShrink < 0.14) then
-						--print("tiny")
 						wigglerShrink = 0.14
 					end
 
@@ -597,30 +706,15 @@ function love.draw(mouseX, mouseY)
 					local linkCentre = {x = connection.links[Index].x-xWobble, y = connection.links[Index].y+yWobble}
 					local angleFromY = calculateSourceYAngleAny(nextLinkCentre,linkCentre)
 					
-				
-					
 
-					-- left side wigglers
-						--first div = how far along the wiggler, 3 would be almost on the link and 1 would be the end of the wiggler, so this is the range
-						--second div = how small the bend i.e. /2 is the biggest bend
-						-- todo: make the wigglers actually wiggle themselves and make the bend look curved at all times of the wiggle
-
-
-
-					--Try 3
 					love.graphics.setColor(1,1,1)
-
-					if wigglerShrink < 1 then
-						--print(wigglerShrink)
-						--love.graphics.setColor(1,1,0)
-					end
-
-
 					love.graphics.setLineWidth( 1 )
+
 					love.graphics.translate(linkCentre.x, linkCentre.y)
 					love.graphics.rotate(-angleFromY)
 
-					love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+					-- left side wigglers
+					love.graphics.line(
 						-linkRadius/2, 
 						-linkRadius/1.15,
 						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
@@ -628,23 +722,16 @@ function love.draw(mouseX, mouseY)
 
 					love.graphics.line( -5 +(((math.cos(((math.abs(timer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
 						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),
-
 						---20+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
 						--6-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4),
-
 						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
 						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
-					--first div is what makes wobble 1.6 to 2.5 ish
-					--last div wobble between 2 and 1.2
-
 					
-					-- print(connection.angleFromY)
+					--flip coordinates along the rotated y axis
 					love.graphics.scale(1,-1)
-					--love.graphics.rotate(connection.angleFromY*math.pi/360)
-					--linkcentre.x = linkcentre.x*2
-					--linkcentre.y = linkcentre.y*2
 
-					love.graphics.line(--linkcentre.x, linkcentre.y, --add one that just takes us to the link edge, then remove current start
+					-- right side wigglers
+					love.graphics.line(
 						-linkRadius/2, 
 						-linkRadius/1.15,
 						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
@@ -655,55 +742,29 @@ function love.draw(mouseX, mouseY)
 						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
 						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
 
-					-- before rotation
-					--[[love.graphics.line( -10 +(((math.sin(((math.abs(timer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.2), 
-						-(1.8*linkRadius)+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*1))*2.),
-						(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*1.2), 
-						-(3*linkRadius)+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*1))*2.5))]]
-
-					--linkcentre.x = linkcentre.x/2
+					--revert to normal
 					love.graphics.scale(1,-1)
 					love.graphics.rotate(angleFromY)
 					love.graphics.translate(-linkCentre.x, -linkCentre.y)
 
-
-					-- -1 to 1
-					--  1.6+ (math.sin(((timer+1/3)%0.8)*2.5*math.pi))/2
-
-					--right? handside link wigglers
-					-- to mirror the above once the first side looks good
-
-					--love.graphics.line(linkcentre.x, linkcentre.y, 
-					--	linkcentre.x+(linkcentre.y - prevLinkCentre.y), linkcentre.y-(linkcentre.x - prevLinkCentre.x))
-
-					--love.graphics.setColor(teamColours[connection.team-1]) --green
-
-					--[[love.graphics.line(linkcentre.x, linkcentre.y - linkRadius,
-						linkcentre.x+(((math.sin(((timer)%1.6)*1.25*math.pi)*5))*10), 
-						linkcentre.y-(30*linkRadius)+(((math.sin(((timer)%1.6)*1.25*math.pi)*1))*10))]]
-
 				end
-
-				-- straight link-wobble lines
-				--[[love.graphics.setColor(1, 1, 1)
-				love.graphics.line(link.x, link.y, link.x-connection.linkYStep, link.y+connection.linkXStep)
-				love.graphics.line(link.x, link.y, link.x+connection.linkYStep, link.y-connection.linkXStep)]]
-
-
-				love.graphics.setColor(teamColours[connection.team])
-				if Index == 1 then
-					love.graphics.setColor(0.1, 0.0, 0.1)
-				end
-				love.graphics.setColor(teamColours[connection.team])
-				--link
-				love.graphics.circle('fill', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius-2)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
 
 
 				-- link border
 				love.graphics.setColor(1, 1, 1)
+
+				if connection.destination == 3 and Index == connection.splitLink then
+					
+					love.graphics.setColor(0, 1, 1)
+
+				end
+
 				love.graphics.setLineWidth( 1 )
 				love.graphics.circle('line', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius)
-
+	
+				love.graphics.setColor(teamColours[connection.team])
+				--link
+				love.graphics.circle('fill', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius-2)				-- when tentacles fighting at midpoint, the middle links gets the responder's colour (not the first attacker)
 
 			end
 			xWobble = nextXWobble
@@ -770,11 +831,8 @@ function love.draw(mouseX, mouseY)
 			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
 			--get angle of red line
 			--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
+
 		end
-
-		
-	else
-
 	end
 
 end
