@@ -311,9 +311,7 @@ end
 
 function updateMovingConnections()
 
-	tentacleEnd = connections[#connections].links[1]
-
-	for connectionIndex, connection in ipairs(connections) do
+		for connectionIndex, connection in ipairs(connections) do
 		if connection.moving == true then
 			-- breaking a connection
 			if connection.destination == 0 then 
@@ -343,6 +341,8 @@ function updateMovingConnections()
 					else
 						-- not touching
 						-- keep moving but check if touching
+						link.x = link.x + (connection.linkXStep/20)
+						link.y = link.y + (connection.linkYStep/20)
 					end
 				else
 					-- closer to source, so its short and should move forward
@@ -449,7 +449,7 @@ function splitTentacle(connectionIndex, ix, iy)
 	local ratio = distancebetween(connection.sourceEdge.x, connection.sourceEdge.y, ix, iy) / 
 	distancebetween(connection.sourceEdge.x, connection.sourceEdge.y, connection.targetEdge.x, connection.targetEdge.y)
 
-	connection.splitLink = #connection.links - math.floor(#connection.links * ratio +0.5)-1
+	connection.splitLink = #connection.links - math.floor((#connection.links-1) * ratio)
 
 end
 
@@ -536,16 +536,34 @@ function love.mousereleased(mouseX, mouseY)
 				
 				if (connection.destination < 2 or connection.moving == true) and connection.destination ~= 3  then
 					connection.destination = 0
+					nodes[connection.source].population = nodes[connection.source].population +1
 				else
 					connection.destination = 3 
 					splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
 					nodes[connection.target].population = nodes[connection.target].population + 1
-					
-					if distancebetween(connection.links[connection.splitLink+1].x, connection.links[connection.splitLink+1].y, connection.sourceEdge.x, connection.sourceEdge.y) < 
-						distancebetween(connection.links[connection.splitLink+1].x, connection.links[connection.splitLink+1].y, connection.targetEdge.x, connection.targetEdge.y) then
-						nodes[connection.target].population = nodes[connection.target].population - 1
+					print(connection.splitLink, #connection.links)
+					if connection.splitLink < 1 then
+						connection.splitLink = 1
+					end
+					print(connection.splitLink)
+					y = connection.links[connection.splitLink].x
+					if distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.sourceEdge.x, connection.sourceEdge.y) < --splitLink is the index
+						distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.targetEdge.x, connection.targetEdge.y) then
+						if nodes[connection.target].team == connection.team then --close to source
+							nodes[connection.source].population = nodes[connection.source].population +1
+							nodes[connection.target].population = nodes[connection.target].population - 2
+						else
+							nodes[connection.source].population = nodes[connection.source].population +1
+							nodes[connection.target].population = nodes[connection.target].population 
+						end
 					else
-						nodes[connection.source].population = nodes[connection.source].population - 1
+						if nodes[connection.target].team == connection.team then --close to target
+							nodes[connection.source].population = nodes[connection.source].population +1
+							nodes[connection.target].population = nodes[connection.target].population - 2
+						else
+							nodes[connection.source].population = nodes[connection.source].population +1
+							nodes[connection.target].population = nodes[connection.target].population 
+						end
 					end
 				end
 
