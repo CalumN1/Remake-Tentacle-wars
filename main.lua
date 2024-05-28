@@ -116,9 +116,9 @@ function love.load()
             		y = 200
             	}
             },
-            destination = 2,
+            destination = 2,  -- 0 = source, 1 = mid point, 2 = target, 3 = split so source and target
         	opposedConnectionIndex = 0, -- 0 means no opposed connection
-        	splitLink = 0
+        	splitLink = 0 -- 0 means no split
         }
     }
 
@@ -332,21 +332,75 @@ function updateMovingConnections()
 
 			-- moving a connection to midpoint 
 			elseif connection.destination == 1 then
+				--print(connection.moving)
 				if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.sourceEdge.x, connection.sourceEdge.y) then
 					-- closer to target, so its long and needs to move back
-					if connection.tentacleEnd.x == connections[connection.opposedConnectionIndex].tentacleEnd.x then
+					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 or 
+						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 10 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
 						-- touching
-						link.x = link.x - (connection.linkXStep/10)
-						link.y = link.y - (connection.linkYStep/10)
+						for linkIndex, link in ipairs(connection.links) do
+							link.x = link.x - (connection.linkXStep/20) -- back
+							link.y = link.y - (connection.linkYStep/20)
+
+							if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+								table.remove(connection.links, linkIndex)
+								nodes[connection.source].population = nodes[connection.source].population + 1
+							end
+						end
+						
 					else
 						-- not touching
 						-- keep moving but check if touching
-						link.x = link.x + (connection.linkXStep/20)
-						link.y = link.y + (connection.linkYStep/20)
+						for linkIndex, link in ipairs(connection.links) do
+							link.x = link.x + (connection.linkXStep/20)
+							link.y = link.y + (connection.linkYStep/20)
+
+								-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
+							if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+								table.insert(connection.links, {
+								x = connection.links[#connection.links].x - (connection.linkXStep),
+								y = connection.links[#connection.links].y - (connection.linkYStep)
+								})
+								nodes[connection.source].population = nodes[connection.source].population - 1
+							end
+						end
+						
 					end
 				else
 					-- closer to source, so its short and should move forward
+					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 then
+						-- touching, set end point
+						
+					else
+						-- not touching
 
+						
+					end
+					-- keep moving either way
+					for linkIndex, link in ipairs(connection.links) do
+						link.x = link.x + (connection.linkXStep/20)
+						link.y = link.y + (connection.linkYStep/20)
+
+						-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
+						if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+							table.insert(connection.links, {
+								x = connection.links[#connection.links].x - (connection.linkXStep),
+								y = connection.links[#connection.links].y - (connection.linkYStep)
+							})
+							nodes[connection.source].population = nodes[connection.source].population - 1
+						end
+				
+					end
+				end
+
+				-- reached target?
+				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
+				print(connection.connectionMidPoint.x )
+				if ( distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 and 
+					math.abs(connection.tentacleEnd.x - connection.connectionMidPoint.x) < 2 and math.abs(connection.tentacleEnd.y - connection.connectionMidPoint.y) < 2  ) then
+					print("Opposition locked")
+					connection.moving = false
+					connections[connection.opposedConnectionIndex].moving = false
 				end
 			
 			-- moving a connection to target 
@@ -490,8 +544,8 @@ function love.mousereleased(mouseX, mouseY)
             	y = edges.sourceY
             },
             connectionMidPoint = {
-            	x = 200,
-            	y = 200
+            	x = (edges.sourceX + edges.targetX)/2,
+            	y = (edges.sourceY + edges.targetY)/2
             },
             linkXStep = linkSteps.x,
             linkYStep = linkSteps.y,
@@ -677,7 +731,7 @@ function love.draw(mouseX, mouseY)
 			-- this is a bit wierd, the first loop through creates the next wobble i.e. for link 1, then the next loop we set "next wobble" to current wobble and create the next wobble for link 2 then give link 1 the current wobble 
 			local nextXWobble = 0
 			local nextYWobble = 0
-			if (Index+1 > 2 and Index < #connection.links -2) or connection.moving == true then
+			if (Index+1 > 2 and Index < #connection.links -2) or (connection.moving == true and connection.destination ~= 3) then
 				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
 				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
 			elseif Index+1 == 2 or Index == #connection.links -2 then
@@ -698,8 +752,12 @@ function love.draw(mouseX, mouseY)
 				love.graphics.setColor(1, 1, 1)
 				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
 
-
-					local linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
+					local linkToTargetDist
+					if connection.destination == 3 then
+						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.connectionMidPoint.x, connection.connectionMidPoint.y) --ignores wobble
+					else
+						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
+					end
 					local linkToSourceDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.sourceEdge.x, connection.sourceEdge.y) 
 
 					if connection.moving == true and linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then -- 108 to 0 away, 2 was 59
@@ -771,12 +829,6 @@ function love.draw(mouseX, mouseY)
 				-- link border
 				love.graphics.setColor(1, 1, 1)
 
-				if connection.destination == 3 and Index == connection.splitLink then
-					
-					love.graphics.setColor(0, 1, 1)
-
-				end
-
 				love.graphics.setLineWidth( 1 )
 				love.graphics.circle('line', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius)
 	
@@ -787,6 +839,21 @@ function love.draw(mouseX, mouseY)
 			end
 			xWobble = nextXWobble
 			yWobble = nextYWobble
+		end
+
+		if connection.destination == 1 and connection.moving == false then
+			--create midpoint link
+			love.graphics.setColor(teamColours[connection.team])
+			--love.graphics.circle('fill', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+2)
+			love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
+			love.graphics.setColor(teamColours[connections[connection.opposedConnectionIndex].team])
+			love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+
+			--border
+			love.graphics.setColor(1, 1, 1)
+
+			love.graphics.setLineWidth( 2 )
+			love.graphics.circle('line', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1)
 		end
 	end
 
