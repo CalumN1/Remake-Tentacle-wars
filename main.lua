@@ -27,7 +27,6 @@ function love.load()
 	linkRadius = 7
 	linkSpacing = 10
 
-
     nodeSelected = 0
     pointSelected = 0
 
@@ -41,9 +40,9 @@ function love.load()
         {
             x = arenaWidth / 3,
             y = 100,
-            team = 2,
+            team = 2,  -- team starts from 0 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
             population = 30,
-            tier = 1,
+            tier = 2,
             regenDelay = 5,
             regenTimer = 5
         },
@@ -52,7 +51,7 @@ function love.load()
             y = 100,
             team = 1,
             population = 10,
-            tier = 1,
+            tier = 2,
             regenDelay = 5,
             regenTimer = 5
         },
@@ -61,7 +60,7 @@ function love.load()
             y = nodeMapHeight - 200,
             team = 1,
             population = 50,
-            tier = 1,
+            tier = 2,
             regenDelay = 5,
             regenTimer = 5
         },
@@ -70,7 +69,7 @@ function love.load()
             y = nodeMapHeight - 100,
             team = 3,
             population = 3,
-            tier = 1,
+            tier = 2,
             regenDelay = 5,
             regenTimer = 5
         },
@@ -79,14 +78,14 @@ function love.load()
             y = nodeMapHeight - 600,
             team = 3,
             population = 50,
-            tier = 1,
+            tier = 2,
             regenDelay = 5,
             regenTimer = 5
         },
     }
 
     connections = {
-        {
+       --[[ {
             population = 2,
             team = 1,
             moving = false,
@@ -117,15 +116,27 @@ function love.load()
             	}
             },
             destination = 2,  -- 0 = source, 1 = mid point, 2 = target, 3 = split so source and target
-        	opposedConnectionIndex = 0, -- 0 means no opposed connection
+        	opposedConnectionIndex= 0, -- 0 means no opposed connection
         	splitLink = 0 -- 0 means no split
-        }
+        }]]
     }
 
     teamColours = {
     	{0.7, 0.7, 0.7},
     	{0.1, 0.7, 0.1},
     	{0.7, 0.2, 0.2}
+    }
+
+
+    nodeTiers = { --Tiers change when the population exceeds the min or max
+    	--node.tier is the index of the relevant ranges
+    	-- In the game, lower tiers generate faster
+    	{min = -20, max = 14} , -- spore 		regen:	18 in 40s		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+    	{min = 6, max = 39}, -- embryo					17							37
+    	{min = , max = 79},	-- pulsar-A					15							49
+    	{min = 61, max = 119},	-- pulsar-B				13							72
+    	{min = 101, max = 159},	-- Ant					9							109
+    	{min = 141, max = 220}	-- Predator				7							260: ~66 in 10s, 130 in 20s
     }
 
 
@@ -291,6 +302,25 @@ function love.update(dt)
 	timer = timer + dt
 	-- print(timer)
 
+	-- regen
+	 	-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
+	for nodeIndex, node in ipairs(nodes) do
+		if node.team > 1 then
+			node.regenTimer = node.regenTimer - dt
+			if node.regenTimer < 0 then
+				node.regenTimer = node.regenDelay
+				node.population = node.population +1
+			end
+		end
+
+
+		if node.population
+	end
+
+
+
+
+
 	-- remove duplicate connections
 	for connectionIndex1, connection1 in ipairs(connections) do
 		for connectionIndex2, connection2 in ipairs(connections) do
@@ -311,8 +341,14 @@ end
 
 function updateMovingConnections()
 
-		for connectionIndex, connection in ipairs(connections) do
+	for connectionIndex, connection in ipairs(connections) do
 		if connection.moving == true then
+
+			if #connection.links > 0 then
+				connection.tentacleEnd.x = connection.links[1].x
+				connection.tentacleEnd.y = connection.links[1].y
+			end
+
 			-- breaking a connection
 			if connection.destination == 0 then 
 				for linkIndex, link in ipairs(connection.links) do
@@ -326,6 +362,7 @@ function updateMovingConnections()
 						connection.moving = false
 						nodes[connection.source].population = nodes[connection.source].population - 1
 						table.remove(connections, connectionIndex)
+						adjustConnectionIndexes(connectionIndex)
 					end
 					
 				end
@@ -335,6 +372,7 @@ function updateMovingConnections()
 				--print(connection.moving)
 				if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.sourceEdge.x, connection.sourceEdge.y) then
 					-- closer to target, so its long and needs to move back
+					--print(connection.opposedConnectionIndex)
 					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 or 
 						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 10 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
 						-- touching
@@ -395,7 +433,7 @@ function updateMovingConnections()
 
 				-- reached target?
 				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
-				print(connection.connectionMidPoint.x )
+				-- print(connection.connectionMidPoint.x )
 				if ( distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 and 
 					math.abs(connection.tentacleEnd.x - connection.connectionMidPoint.x) < 2 and math.abs(connection.tentacleEnd.y - connection.connectionMidPoint.y) < 2  ) then
 					print("Opposition locked")
@@ -448,6 +486,16 @@ function updateMovingConnections()
 								if nodes[connection.target].population < 0 then
 									nodes[connection.target].team = connection.team 
 									nodes[connection.target].population = math.abs(nodes[connection.target].population)
+									for connectionIndex2, connection2 in ipairs(connections) do
+										if connection2.source == connection.target then
+											connection2.destination = 0
+											connection2.moving = true
+											connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+											connections[connection2.opposedConnectionIndex].moving = true
+											connections[connection2.opposedConnectionIndex].destination = 2
+											connection2.opposedConnectionIndex = 0
+										end
+									end
 								end
 							end
 						end
@@ -467,8 +515,13 @@ function updateMovingConnections()
 				connection.tentacleEnd.y = connection.links[1].y
 			end
 
-			if nodes[connection.source].population == 0 and connection.moving == true and connection.destination ~= 0 then
+			if nodes[connection.source].population == 0 and connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3 then
 				connection.destination = 0
+				nodes[connection.source].population = nodes[connection.source].population + 1
+				if connection.destination == 1 then
+					connections[connection.opposedConnectionIndex].destination = 2
+					connections[connection.opposedConnectionIndex].moving = true
+				end
 			end
 		end
 	end
@@ -480,14 +533,31 @@ function checkOpposedConnections()
 	for connectionIndex1, connection1 in ipairs(connections) do
 		for connectionIndex2, connection2 in ipairs(connections) do
 			-- work out if a connection is opposed and set opposed
-			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and connection2.opposedConnectionIndex == 0 then 
-				connection1.opposedConnectionIndex = connectionIndex2
-				connection2.opposedConnectionIndex = connectionIndex1
-				print("OPPOSED!")
+			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and 
+				connection2.opposedConnectionIndex == 0 and connection1.destination > 0 and connection2.destination > 0 then 
 
-				connection1.destination = 1
-				connection2.destination = 1
+				if connection1.team == connection2.team then
+					if connectionIndex1 < connectionIndex2 then
+						connection1.destination = 0
+						connection2.destination = 2
 
+						nodes[connection1.source].population = nodes[connection1.source].population + 1
+					else
+						--do nothing, the above will trigger in a later loop
+
+					end
+				else
+
+					connection1.opposedConnectionIndex= connectionIndex2
+					connection2.opposedConnectionIndex= connectionIndex1
+					print("OPPOSED!", connection1.opposedConnectionIndex, " - ", connection2.opposedConnectionIndex)
+
+					connection1.destination = 1
+					connection2.destination = 1
+					
+				end
+				connection1.moving = true
+				connection2.moving = true
 			end
 		end
 	end
@@ -495,6 +565,29 @@ function checkOpposedConnections()
 end
 
 
+function adjustConnectionIndexes(deletedConnectionIndex)
+
+	local totalConnections = #connections
+
+	print(totalConnections,"ConnectionIndex round up: ")
+	for connectionIndex, connection in ipairs(connections) do
+		print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
+	end
+
+	for i = 1, totalConnections do
+		if connections[i].opposedConnectionIndex > deletedConnectionIndex then
+			connections[i].opposedConnectionIndex = connections[i].opposedConnectionIndex -1
+		end
+	end
+
+
+	print(totalConnections,"POST - ConnectionIndex round up: ")
+	for connectionIndex, connection in ipairs(connections) do
+		print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
+	end
+
+
+end
 
 function splitTentacle(connectionIndex, ix, iy)
 
@@ -552,10 +645,9 @@ function love.mousereleased(mouseX, mouseY)
             links = {
             },
             destination = 2,
-            opposedConnectionIndex = 0,
+            opposedConnectionIndex= 0,
             splitLink = 0
 		})
-
 
 		-- link creation
 			--loops from 1 to number of nodes that would fit in the distance 
@@ -579,27 +671,35 @@ function love.mousereleased(mouseX, mouseY)
 		end
 		print(" ------------------- ")
 
+		checkOpposedConnections()
 
 	-- cutting a connection
 	elseif (nodeSelected == 0 and pointSelected ~= 0) then
-		-- check every connection for intersection
+		local releaseMouseX = love.mouse.getX()
+		local releaseMouseY = love.mouse.getY()
+		-- check every connection for an intersection, allows multiple cut lines
 		for connectionIndex, connection in ipairs(connections) do 
-			ix, iy = findIntersectionPoint(connection.sourceEdge.x,connection.sourceEdge.y, connection.targetEdge.x,connection.targetEdge.y, pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
-			if ix ~= nil and iy ~= nil then
-				love.graphics.circle('line', ix, iy, linkRadius)
-				
-				if (connection.destination < 2 or connection.moving == true) and connection.destination ~= 3  then
+			ix, iy = findIntersectionPoint(connection.sourceEdge.x,connection.sourceEdge.y, connection.targetEdge.x,connection.targetEdge.y, pointSelected.x, pointSelected.y, releaseMouseX, releaseMouseY)
+			if ix ~= nil and iy ~= nil then -- intersection exists
+								
+				if (connection.destination == 1 or (connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3))  then 
+					-- go home
 					connection.destination = 0
+					if connection.opposedConnectionIndex > 0 then
+						connection.opposedConnectionIndex = 0
+						print(connectionIndex, connection.opposedConnectionIndex)
+					end
 					nodes[connection.source].population = nodes[connection.source].population +1
-				else
+				elseif connection.destination == 2 then
+					-- initiate split!
 					connection.destination = 3 
 					splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
 					nodes[connection.target].population = nodes[connection.target].population + 1
-					print(connection.splitLink, #connection.links)
+					print(connection.splitLink," links: ", #connection.links)
 					if connection.splitLink < 1 then
 						connection.splitLink = 1
 					end
-					print(connection.splitLink)
+					--print(connection.splitLink)
 					y = connection.links[connection.splitLink].x
 					if distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.sourceEdge.x, connection.sourceEdge.y) < --splitLink is the index
 						distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.targetEdge.x, connection.targetEdge.y) then
@@ -633,49 +733,11 @@ function newRound() -- consider moving whole function into load function? like i
 
 	-- New round
 
-	-- source node to unit calculations
-	for connectionIndex, connection in ipairs(connections) do
-		-- turn each connection into units
-		table.insert(units, {
-		source = connection.source, target = connection.target, population = connection.population, team = nodes[connection.source].team
-		})
-		-- remove the new unit's population from the source's population
-		nodes[connection.source].population = nodes[connection.source].population - connection.population
-	end
-
-	-- remove connections, as they've all been turned into units
-	connections = {}
 	
-
-	-- units to target calculations
-	for unitsIndex, unit in ipairs(units) do
-		if nodes[unit.target].team == unit.team then --friendly node
-			nodes[unit.target].population = nodes[unit.target].population + unit.population
-		else -- enemy node
-			if nodes[unit.target].block > 0 then
-				nodes[unit.target].block = nodes[unit.target].block - unit.population
-				if nodes[unit.target].block < 0 then
-					unit.population = -nodes[unit.target].block 
-					nodes[unit.target].block = 0
-				else
-					unit.population = 0
-				end
-			end
-			nodes[unit.target].population = nodes[unit.target].population - unit.population
-			if nodes[unit.target].population < 0 then
-				nodes[unit.target].team = unit.team
-				nodes[unit.target].population = -nodes[unit.target].population
-			end
-		end
-	end
-
-	units = {}
 
 	-- regeneration
 	for nodeIndex, node in ipairs(nodes) do
-		if node.team > 0 then
-			node.population = node.population + 1
-		end
+		
 	end
 
 end
@@ -753,8 +815,11 @@ function love.draw(mouseX, mouseY)
 				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
 
 					local linkToTargetDist
-					if connection.destination == 3 then
-						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.connectionMidPoint.x, connection.connectionMidPoint.y) --ignores wobble
+					if connection.destination == 1 then
+						-- if something flags here its probably to do with tentacle end 
+						--print(connections[connection.opposedConnectionIndex].tentacleEnd.x)
+						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
+						
 					else
 						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
 					end
@@ -767,7 +832,7 @@ function love.draw(mouseX, mouseY)
 					end
 
 					local wigglerShrink = 1
-					if linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
+					if linkToTargetDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then --arbitrary numbers here to get desired effect
 						wigglerShrink = (linkToTargetDist/108) * (linkToTargetDist/108)
 					elseif linkToSourceDist < 2*linkRadius + 2*linkSpacing + 10*linkRadius then
 						wigglerShrink = (linkToSourceDist/108) * (linkToSourceDist/108)
@@ -841,19 +906,18 @@ function love.draw(mouseX, mouseY)
 			yWobble = nextYWobble
 		end
 
-		if connection.destination == 1 and connection.moving == false then
+		if connection.destination == 1 and (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 or connection.moving == false)then
 			--create midpoint link
 			love.graphics.setColor(teamColours[connection.team])
-			--love.graphics.circle('fill', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+2)
-			love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
+			-- animation spinning midpoint
+			love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
 			love.graphics.setColor(teamColours[connections[connection.opposedConnectionIndex].team])
-			love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+			love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
 
-			--border
+			-- midpoint border
 			love.graphics.setColor(1, 1, 1)
-
-			love.graphics.setLineWidth( 2 )
-			love.graphics.circle('line', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1)
+			love.graphics.setLineWidth( 1 )
+			love.graphics.circle('line', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius+1)
 		end
 	end
 
@@ -861,26 +925,17 @@ function love.draw(mouseX, mouseY)
 	-- draw all nodes and population number
 	for nodeIndex, node in ipairs(nodes) do
 		-- draw node depending on team colour
-		--[[if node.team == 0 then
-			love.graphics.setColor(0.7, 0.7, 0.7)
-		elseif node.team == 1 then
-		    love.graphics.setColor(0.1, 0.7, 0.1)
-		elseif node.team == 2 then
-		    love.graphics.setColor(0.7, 0.2, 0.2)
-		else
-			love.graphics.setColor(1, 1, 1)
-		end]]
 		love.graphics.setColor(teamColours[node.team])
 		-- draw node
 		love.graphics.circle('fill', node.x, node.y, nodeRadius-10)
-		-- border
+		-- node border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
 		love.graphics.circle('line', node.x, node.y, nodeRadius-10)
-		-- outer ring
+		-- outer node ring
 		love.graphics.circle('line', node.x, node.y, nodeRadius)
 
-	 	--feelers
+	 	--node feelers
 	 	love.graphics.setLineWidth( 1 )
 	 	for i = 1, 8 do
 			love.graphics.line(node.x, node.y-(nodeRadius), 
