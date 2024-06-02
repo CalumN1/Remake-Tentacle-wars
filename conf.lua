@@ -10,9 +10,11 @@ function love.conf(t)
 
     t.console = false
 
-    t.window.title = "Twar"
+    t.window.title = "Tentacle Wars - Remake"
     t.window.icon = nil 
 
     t.window.x = nil                    -- The x-coordinate of the window's position in the specified display (number)
     t.window.y = nil                    -- The y-coordinate of the window's position in the specified display (number)
+
+    t.window.vsync = 0                  -- Vertical sync mode (number) - 0 = disables, 1 enabled
 end

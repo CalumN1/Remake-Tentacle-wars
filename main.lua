@@ -22,7 +22,10 @@ function love.load()
     font20 = love.graphics.newFont(20)
     font28 = love.graphics.newFont(28)
 
-	nodeRadius = 36  -- outer ring
+
+
+    nodeCentreRadius = 26
+	--nodeRadius = 36  -- outer ring, will vary, changing for nodeTiers[node.tier].radius
 
 	linkRadius = 7
 	linkSpacing = 10
@@ -30,57 +33,77 @@ function love.load()
     nodeSelected = 0
     pointSelected = 0
 
+    deliverySpeed = 0.1 --seconds before moving forward
+    deliveryTimer = 0
+
     cutSource = {
     	--x = 5
     	-- y = 10
     }
 
 
+    FPStarget = 160 --forced FPS otherwise speeds change, maybe adjust speeds relative to FPS later?
+
+    tickCount = 0
+
+    tickPeriod = 1/50 -- seconds per tick
+	accumulator = 0.0
+
     nodes = {
         {
             x = arenaWidth / 3,
-            y = 100,
+            y = 150,
             team = 2,  -- team starts from 0 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-            population = 30,
-            tier = 2,
-            regenDelay = 5,
-            regenTimer = 5
+            population = 10,
+            tier = 1,
+            regenTimer = 5,
+            tentaclesUsed = 0
+            -- regen Delay comes from the tiers table now
         },
         {
             x = arenaWidth / 1.5, 
-            y = 100,
+            y = 150,
             team = 1,
-            population = 10,
+            population = 20,
             tier = 2,
-            regenDelay = 5,
-            regenTimer = 5
+            regenTimer = 5,
+            tentaclesUsed = 0
         },
         {
-            x = 100,
+            x = 200,
+            y = nodeMapHeight/ 3,
+            team = 1,
+            population = 40,
+            tier = 3,
+            regenTimer = 5,
+            tentaclesUsed = 0
+        },
+        {
+            x = 400,
             y = nodeMapHeight - 200,
             team = 1,
-            population = 50,
-            tier = 2,
-            regenDelay = 5,
-            regenTimer = 5
+            population = 80,
+            tier = 4,
+            regenTimer = 5,
+            tentaclesUsed = 0
         },
         {
-            x = arenaWidth / 2,
-            y = nodeMapHeight - 100,
+            x = arenaWidth / 1.5,
+            y = nodeMapHeight - 200,
             team = 3,
-            population = 3,
-            tier = 2,
-            regenDelay = 5,
-            regenTimer = 5
+            population = 120,
+            tier = 5,
+            regenTimer = 5,
+            tentaclesUsed = 0
         },
         {
-            x = arenaWidth - 100,
-            y = nodeMapHeight - 600,
+            x = arenaWidth - 200,
+            y = nodeMapHeight - 500,
             team = 3,
-            population = 50,
-            tier = 2,
-            regenDelay = 5,
-            regenTimer = 5
+            population = 180,
+            tier = 6,
+            regenTimer = 5,
+            tentaclesUsed = 0
         },
     }
 
@@ -117,7 +140,9 @@ function love.load()
             },
             destination = 2,  -- 0 = source, 1 = mid point, 2 = target, 3 = split so source and target
         	opposedConnectionIndex= 0, -- 0 means no opposed connection
-        	splitLink = 0 -- 0 means no split
+        	splitLink = 0, -- 0 means no split
+        	glowing = {},
+        	sendTimer
         }]]
     }
 
@@ -131,20 +156,20 @@ function love.load()
     nodeTiers = { --Tiers change when the population exceeds the min or max
     	--node.tier is the index of the relevant ranges
     	-- In the game, lower tiers generate faster
-    	{min = -20, max = 14} , -- spore 		regen:	18 in 40s		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
-    	{min = 6, max = 39}, -- embryo					17							37
-    	{min = , max = 79},	-- pulsar-A					15							49
-    	{min = 61, max = 119},	-- pulsar-B				13							72
-    	{min = 101, max = 159},	-- Ant					9							109
-    	{min = 141, max = 220}	-- Predator				7							260: ~66 in 10s, 130 in 20s
-    }
+    	{min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1, maxTentacles = 1}, -- spore regen: 0 tents:18 in 40s	1:8		2:-	delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+    	{min = 6, max = 39, radius = 36, regenDelay =  2.3, sendDelay = 1, maxTentacles = 2}, -- embryo					17			9		4				37
+    	{min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
+    	{min = 61, max = 119, radius = 47, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
+    	{min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
+    	{min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
+    }	-- regen halfs per tentacle roughly
 
 
 
     function isMouseInNode()
         
     	for nodeIndex, node in ipairs(nodes) do
-	    	if distancebetween(love.mouse.getX(), love.mouse.getY(), node.x, node.y) < nodeRadius+10 then
+	    	if distancebetween(love.mouse.getX(), love.mouse.getY(), node.x, node.y) < nodeTiers[node.tier].radius+10 then
 				return nodeIndex
 			end
 
@@ -254,36 +279,40 @@ function calculateNodeEdges(sourceNode, targetNode)
 
 	local sourceAngle = math.asin(longXOpposite/longHypot)
 
-	local shortHypot = nodeRadius
-	local shortXOpposite = shortHypot * math.sin(sourceAngle)
-	local shortYAdjacent = shortHypot * math.cos(sourceAngle)
+	local shortSourceHypot = nodeTiers[nodes[sourceNode].tier].radius
+	local shortSourceXOpposite = shortSourceHypot * math.sin(sourceAngle)
+	local shortSourceYAdjacent = shortSourceHypot * math.cos(sourceAngle)
+
+	local shortTargetHypot = nodeTiers[nodes[targetNode].tier].radius
+	local shortTargetXOpposite = shortTargetHypot * math.sin(sourceAngle)
+	local shortTargetYAdjacent = shortTargetHypot * math.cos(sourceAngle)
 
 	-- source
 	if (nodes[sourceNode].x < nodes[targetNode].x) then
-		sourceX = nodes[sourceNode].x + shortXOpposite
+		sourceX = nodes[sourceNode].x + shortSourceXOpposite
 	else
-		sourceX = nodes[sourceNode].x - shortXOpposite
+		sourceX = nodes[sourceNode].x - shortSourceXOpposite
 	end
 
 	if (nodes[sourceNode].y < nodes[targetNode].y) then
-		sourceY = nodes[sourceNode].y + shortYAdjacent
+		sourceY = nodes[sourceNode].y + shortSourceYAdjacent
 	else
-		sourceY = nodes[sourceNode].y - shortYAdjacent
+		sourceY = nodes[sourceNode].y - shortSourceYAdjacent
 	end
 
 
 	-- target
 	-- reverse of source
 	if (nodes[sourceNode].x < nodes[targetNode].x) then
-		targetX = nodes[targetNode].x - shortXOpposite
+		targetX = nodes[targetNode].x - shortTargetXOpposite
 	else
-		targetX = nodes[targetNode].x + shortXOpposite
+		targetX = nodes[targetNode].x + shortTargetXOpposite
 	end
 
 	if (nodes[sourceNode].y < nodes[targetNode].y) then
-		targetY = nodes[targetNode].y - shortYAdjacent
+		targetY = nodes[targetNode].y - shortTargetYAdjacent
 	else
-		targetY = nodes[targetNode].y + shortYAdjacent
+		targetY = nodes[targetNode].y + shortTargetYAdjacent
 	end
 
 
@@ -299,48 +328,107 @@ end
 
 function love.update(dt)
 
+	  -- trying to force an FPS as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things to tentacles to move faster. tricky
 	timer = timer + dt
-	-- print(timer)
+	accumulator = accumulator + dt--*6
+  	if accumulator > 1/ FPStarget then
 
-	-- regen
-	 	-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
-	for nodeIndex, node in ipairs(nodes) do
-		if node.team > 1 then
-			node.regenTimer = node.regenTimer - dt
-			if node.regenTimer < 0 then
-				node.regenTimer = node.regenDelay
-				node.population = node.population +1
+  		--print(accumulator, " ", dt, " ", tickPeriod)
+    	-- Here be your fixed timestep.
+    	tickCount = tickCount + 1
+
+		--[[if timer > 3 then
+			if tickCount < 360 then
+				tickCount = 360
+			end
+			tickCount = tickCount + 1
+		end
+
+		--set game tick to match frames of 120
+		if dt < 1/120 then
+			love.timer.sleep(1/120 - dt)
+			--print(dt, " -> ", 1/120)
+			 --/120
+		end
+
+		if math.floor(tickCount) == math.floor(tickCount*100)/100 then
+			print(tickCount/timer)
+		end
+
+		dt = 1/120]]
+
+		
+		--print(tickCount/timer)
+
+		deliveryTimer = deliveryTimer - 1/FPStarget
+
+		for connectionIndex, connection in ipairs(connections) do
+			if connection.moving ~= true then
+				connection.sendTimer = connection.sendTimer - 1/FPStarget
+			end
+		end
+
+		-- print(timer)
+
+		-- regen
+		 	-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
+		for nodeIndex, node in ipairs(nodes) do
+			if node.team > 1 then
+				node.regenTimer = node.regenTimer - dt
+				if node.regenTimer < 0 then
+					node.regenTimer = nodeTiers[node.tier].regenDelay
+					node.population = node.population +1
+				end
+			end
+
+			-- tier change
+			if node.population > nodeTiers[node.tier].max then  -- add a white growing fading circle effect from edge when tiering up or down, or sending a tentacle, team changing, recalling as cant reach
+				node.tier = node.tier + 1
+				print("Tier UP!")
+				--node
+			elseif node.population < nodeTiers[node.tier].min then
+				node.tier = node.tier -1
+				print("Tier down")
+			end
+
+			if node.population > 200 then
+				node.population = 200
+			elseif node.population < -5 then
+				node.population = 0
 			end
 		end
 
 
-		if node.population
-	end
 
 
 
+		-- remove duplicate connections
+		for connectionIndex1, connection1 in ipairs(connections) do
+			for connectionIndex2, connection2 in ipairs(connections) do
 
-
-	-- remove duplicate connections
-	for connectionIndex1, connection1 in ipairs(connections) do
-		for connectionIndex2, connection2 in ipairs(connections) do
-
-			if connection1.source == connection2.source and connection1.target == connection2.target and connectionIndex1 ~= connectionIndex2 then 
-				table.remove(connections, connectionIndex2)
-				print("removed duplicate: ", connection2.source, " -> ", connection2.target)
+				if connection1.source == connection2.source and connection1.target == connection2.target and connectionIndex1 ~= connectionIndex2 then 
+					table.remove(connections, connectionIndex2)
+					print("removed duplicate: ", connection2.source, " -> ", connection2.target)
+				end
 			end
 		end
-	end
-	
-	-- move this to run only when a cut, node-loss, or new connection is made
-	checkOpposedConnections()
-	
-	updateMovingConnections()
+		
+		-- move this to run only when a cut, node-loss, or new connection is made
+		checkOpposedConnections()
+		
+		updateMovingConnections()
+
+		glowDelivery()
+
+
+		accumulator = accumulator - 1/FPStarget
+  	end
 end
 
 
 function updateMovingConnections()
 
+	
 	for connectionIndex, connection in ipairs(connections) do
 		if connection.moving == true then
 
@@ -354,7 +442,7 @@ function updateMovingConnections()
 				for linkIndex, link in ipairs(connection.links) do
 					link.x = link.x - (connection.linkXStep/7)
 					link.y = link.y - (connection.linkYStep/7)
-					if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+					if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 						table.remove(connection.links, linkIndex)
 						nodes[connection.source].population = nodes[connection.source].population + 1
 					end
@@ -380,7 +468,7 @@ function updateMovingConnections()
 							link.x = link.x - (connection.linkXStep/20) -- back
 							link.y = link.y - (connection.linkYStep/20)
 
-							if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+							if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 								table.remove(connection.links, linkIndex)
 								nodes[connection.source].population = nodes[connection.source].population + 1
 							end
@@ -394,7 +482,7 @@ function updateMovingConnections()
 							link.y = link.y + (connection.linkYStep/20)
 
 								-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
-							if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+							if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 								table.insert(connection.links, {
 								x = connection.links[#connection.links].x - (connection.linkXStep),
 								y = connection.links[#connection.links].y - (connection.linkYStep)
@@ -420,7 +508,7 @@ function updateMovingConnections()
 						link.y = link.y + (connection.linkYStep/20)
 
 						-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
-						if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+						if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 							table.insert(connection.links, {
 								x = connection.links[#connection.links].x - (connection.linkXStep),
 								y = connection.links[#connection.links].y - (connection.linkYStep)
@@ -449,7 +537,7 @@ function updateMovingConnections()
 				end
 
 				-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
-				if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeRadius-linkRadius then
+				if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 					table.insert(connection.links, {
 						x = connection.links[#connection.links].x - (connection.linkXStep),
 						y = connection.links[#connection.links].y - (connection.linkYStep)
@@ -459,7 +547,7 @@ function updateMovingConnections()
 
 				-- reached target?
 				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
-				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeRadius+2 then
+				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeTiers[nodes[connection.target].tier].radius+2 then
 					connection.moving = false
 				end
 
@@ -469,14 +557,14 @@ function updateMovingConnections()
 					if linkIndex > connection.splitLink then --send to source
 						link.x = link.x - (connection.linkXStep/7)
 						link.y = link.y - (connection.linkYStep/7)
-						if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeRadius-linkRadius then
+						if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 							table.remove(connection.links, linkIndex)
 							nodes[connection.source].population = nodes[connection.source].population + 1
 						end
 					else --send to target
 						link.x = link.x + (connection.linkXStep/7)
 						link.y = link.y + (connection.linkYStep/7)
-						if distancebetween(link.x, link.y, nodes[connection.target].x, nodes[connection.target].y) < nodeRadius-linkRadius then
+						if distancebetween(link.x, link.y, nodes[connection.target].x, nodes[connection.target].y) < nodeTiers[nodes[connection.target].tier].radius-linkRadius then
 							table.remove(connection.links, linkIndex)
 							connection.splitLink = connection.splitLink -1
 							if nodes[connection.target].team == connection.team then
@@ -525,6 +613,75 @@ function updateMovingConnections()
 			end
 		end
 	end
+
+	
+
+	
+end
+
+
+function glowDelivery()
+
+	--Glow delivery
+	--print(#connection.glowing)
+
+
+
+
+	if deliveryTimer < 0 then
+
+		for connectionIndex, connection in ipairs(connections) do
+
+			for glowerIndex, glower in ipairs(connection.glowing) do
+				--print(glower)
+				connection.glowing[glowerIndex] = glower - 1
+				--print(glower)
+				if glower < 1 then
+					if nodes[connection.target].team ~= connection.team then
+						nodes[connection.target].population = nodes[connection.target].population - 1
+					else
+						nodes[connection.target].population = nodes[connection.target].population + 1
+					end
+					table.remove(connection.glowing, glowerIndex)
+
+					if nodes[connection.target].population < 0 then
+						nodes[connection.target].team = connection.team 
+						nodes[connection.target].population = math.abs(nodes[connection.target].population)
+						for connectionIndex2, connection2 in ipairs(connections) do
+							if connection2.source == connection.target then
+								connection2.destination = 0
+								connection2.moving = true
+								connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+								connections[connection2.opposedConnectionIndex].moving = true
+								connections[connection2.opposedConnectionIndex].destination = 2
+								connection2.opposedConnectionIndex = 0
+							end
+						end
+					end
+
+				end
+					
+			end
+			--print("____")
+
+			if connection.moving ~= true then
+				--print("check")
+				if connection.sendTimer < 0 then
+					
+					table.insert(connection.glowing, #connection.links)
+					connection.sendTimer = nodeTiers[nodes[connection.source].tier].sendDelay + connection.sendTimer
+				end
+
+			end
+				
+		end
+		-- print(deliveryTimer, " - ", timer % nodeTiers[nodes[connection.source].tier].sendDelay, " vs ", deliverySpeed)
+		deliveryTimer = deliverySpeed
+		
+	end
+
+
+
 end
 
 
@@ -611,6 +768,7 @@ function love.mousereleased(mouseX, mouseY)
 	and releasenode > 0 
 	and nodeSelected ~= releasenode   -- means not equal
 	and nodes[nodeSelected].population > 0
+	and nodes[nodeSelected].tentaclesUsed < nodeTiers[nodes[nodeSelected].tier].maxTentacles
 	then
 
 		local edges = calculateNodeEdges(nodeSelected, releasenode)
@@ -646,7 +804,9 @@ function love.mousereleased(mouseX, mouseY)
             },
             destination = 2,
             opposedConnectionIndex= 0,
-            splitLink = 0
+            splitLink = 0,
+            glowing = {},
+            sendTimer = nodeTiers[nodes[nodeSelected].tier].sendDelay
 		})
 
 		-- link creation
@@ -661,7 +821,8 @@ function love.mousereleased(mouseX, mouseY)
 			y = edges.sourceY
 		})
 		nodes[nodeSelected].population = nodes[nodeSelected].population -1
-		--end
+		
+		nodes[nodeSelected].tentaclesUsed = nodes[nodeSelected].tentaclesUsed + 1
 
 		tentacleEnd = connections[#connections].links[1]
 		
@@ -767,15 +928,23 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)
 
+	love.graphics.print("Forced FPS:"..FPStarget, 150, 10)
 
-	-- draw line between linked nodes
-	-- this is first so its underneath nodes
-	
+	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 350, 10)
+
+
+	--highlight
+	local highlightedNode = isMouseInNode()
+	if highlightedNode > 0 then
+		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+		love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius)
+	end
+
+
+
+	--connection links, link wigglers
 	for connectionIndex, connection in ipairs(connections) do 
 		love.graphics.setColor(0.9, 0.9, 0.2)
-		-- start, 1/8th of the way to the end, 2/8ths, etc. abs timer part ranges linearly from 0.5 to 0 and back to 0.5
-		-- to do: draw a circle at each of these points below then can have the colour change to show flow, and create a loop so size can vary
-		-- also maybe need to add noderadius to start and end points? to look like how tentacle wars does it
 
 		-- link making and wobble:
 				-- ((timer%2)*math.pi)  > this moves smoothly and linearly from 0 to 359.9
@@ -811,7 +980,17 @@ function love.draw(mouseX, mouseY)
 				
 				--linkWigglers
 					-- links needs to be infront of node feelers, maybe redo this loop with just this bit, after node creation
+
 				love.graphics.setColor(1, 1, 1)
+				love.graphics.setLineWidth( 1 )
+				for glowerIndex, glower in ipairs(connection.glowing) do
+					if glower == Index then
+						love.graphics.setColor(1, 1, 0)
+						love.graphics.setLineWidth( 2 )
+					end
+				end
+
+
 				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
 
 					local linkToTargetDist
@@ -847,9 +1026,9 @@ function love.draw(mouseX, mouseY)
 					local linkCentre = {x = connection.links[Index].x-xWobble, y = connection.links[Index].y+yWobble}
 					local angleFromY = calculateSourceYAngleAny(nextLinkCentre,linkCentre)
 					
-
-					love.graphics.setColor(1,1,1)
-					love.graphics.setLineWidth( 1 )
+					--drawing link wigglers, todo: add another line so its more curved
+					--love.graphics.setColor(1,1,1)
+					
 
 					love.graphics.translate(linkCentre.x, linkCentre.y)
 					love.graphics.rotate(-angleFromY)
@@ -892,9 +1071,6 @@ function love.draw(mouseX, mouseY)
 
 
 				-- link border
-				love.graphics.setColor(1, 1, 1)
-
-				love.graphics.setLineWidth( 1 )
 				love.graphics.circle('line', connection.links[Index].x-xWobble, connection.links[Index].y+yWobble, linkRadius)
 	
 				love.graphics.setColor(teamColours[connection.team])
@@ -927,35 +1103,81 @@ function love.draw(mouseX, mouseY)
 		-- draw node depending on team colour
 		love.graphics.setColor(teamColours[node.team])
 		-- draw node
-		love.graphics.circle('fill', node.x, node.y, nodeRadius-10)
+		love.graphics.circle('fill', node.x, node.y, nodeCentreRadius)
 		-- node border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
-		love.graphics.circle('line', node.x, node.y, nodeRadius-10)
+		love.graphics.circle('line', node.x, node.y, nodeCentreRadius)
 		-- outer node ring
-		love.graphics.circle('line', node.x, node.y, nodeRadius)
+		love.graphics.circle('line', node.x, node.y, nodeTiers[node.tier].radius)
 
-	 	--node feelers
+	 	--node feelers and wobblers
 	 	love.graphics.setLineWidth( 1 )
-	 	for i = 1, 8 do
-			love.graphics.line(node.x, node.y-(nodeRadius), 
-				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeRadius)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
-				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeRadius)-5+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
-				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.5), node.y-(nodeRadius)-10+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.5),
-				node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*1), node.y-(nodeRadius)-15+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1))
+	 	
+	 		
+		for i = 1, 8 do
+		 	if node.tier > 1 then
+		 		if node.tier == 2 then
+			 		--node feelers
+					love.graphics.line(node.x, node.y-(nodeTiers[node.tier].radius), 
+						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeTiers[node.tier].radius)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
+						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeTiers[node.tier].radius)-5+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
+						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.5), node.y-(nodeTiers[node.tier].radius)-10+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.5),
+						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*1), node.y-(nodeTiers[node.tier].radius)-15+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1))
+				elseif node.tier > 2 then
 
-			--rotate the whole screen centred on the node, redraw the feeler
-			love.graphics.translate(node.x, node.y)
-			love.graphics.rotate(math.pi/4)
-			love.graphics.translate(-node.x, -node.y) -- I think this sets the origin back to 0,0 but with everything now rotated
+					--node first inner wobblers
+					love.graphics.setColor(teamColours[node.team])
+					love.graphics.circle('fill', node.x, node.y-nodeTiers[node.tier].radius, 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+					--border
+					love.graphics.setColor(1, 1, 1)
+					love.graphics.circle('line', node.x, node.y-nodeTiers[node.tier].radius, 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+
+					if node.tier ~= 5 then
+					--node feelers
+						love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2), 
+							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
+							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
+							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
+							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+					
+
+						
+						
+						if node.tier > 3 then
+							--outer wobblers
+							love.graphics.setColor(teamColours[node.team])
+							love.graphics.circle('fill', node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1)*2*math.pi)+2),
+								linkRadius-2)
+							--border
+							love.graphics.setColor(1, 1, 1)
+							love.graphics.circle('line',  node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1)*2*math.pi)+2),
+								linkRadius-2)
+							
+
+
+						end
+
+					elseif node.tier == 5 then --ant - 2 feelers each and basic extra wobblers
+
+					end
+
+				end
+
+				--rotate the whole screen centred on the node, redraw the feeler
+				love.graphics.translate(node.x, node.y)
+				love.graphics.rotate(math.pi/4)
+				love.graphics.translate(-node.x, -node.y) -- I think this sets the origin back to 0,0 but with everything now rotated
+			end
 		end
 		-- unrotates and resets origin
 		love.graphics.origin()
+		
 
 		-- draw population number
-		love.graphics.setFont(font20)
+		love.graphics.setFont(font20)  -- To-Do: make font bold
 		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(node.population, node.x-nodeRadius, node.y-18, 2*nodeRadius, "center")
+		love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-18, 2*nodeTiers[node.tier].radius, "center")
 	end
 
 	
