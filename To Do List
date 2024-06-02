@@ -1,0 +1,21 @@
+To Do List
+
+- 	fix connection edges changing as nodes tier up and down
+
+-	fix initial connection edges with extraspacing variable
+
+-	Fix connecitons used - regain when connection broken
+
+-	Add ping effect on tier and team (and connection?) change
+
+-	add Ant wobblers and feelers
+
+-	adjust wobbler timings to be more chaotic, paterns easily spottable
+
+-	add predator wobblers
+
+-	find solution for if the game cant garuantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
+
+-	fix above 200 population flicker
+
+-	make generation half per used tentacle

@@ -19,7 +19,7 @@ function love.load()
     love.graphics.setBackgroundColor( 0., 0.1, 0.)
 
     font14 = love.graphics.newFont(14)
-    font20 = love.graphics.newFont(20)
+    nodefont = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
     font28 = love.graphics.newFont(28)
 
 
@@ -41,8 +41,9 @@ function love.load()
     	-- y = 10
     }
 
-
-    FPStarget = 160 --forced FPS otherwise speeds change, maybe adjust speeds relative to FPS later?
+    FPSlogicTarget = 160 --forced FPS otherwise speeds change, maybe adjust speeds relative to FPS later?
+    FPSlogicActual = 0 --actual logic per second
+    FPSlogicTimer = 0
 
     tickCount = 0
 
@@ -328,43 +329,30 @@ end
 
 function love.update(dt)
 
-	  -- trying to force an FPS as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things to tentacles to move faster. tricky
+	  -- trying to force a locked logic rate e.g. 120 updates per second, as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things like tentacles to move faster. tricky
 	timer = timer + dt
-	accumulator = accumulator + dt--*6
-  	if accumulator > 1/ FPStarget then
+	if FPSlogicTimer > 1 then
+		FPSlogicTimer = 0
+		tickCount = 0
+	end
+	FPSlogicTimer = FPSlogicTimer + dt
 
-  		--print(accumulator, " ", dt, " ", tickPeriod)
-    	-- Here be your fixed timestep.
+	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, maybe add a check for if the accumulator gets too high causing the game to be superfast for too long
+  	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run 
+
     	tickCount = tickCount + 1
-
-		--[[if timer > 3 then
-			if tickCount < 360 then
-				tickCount = 360
-			end
-			tickCount = tickCount + 1
-		end
-
-		--set game tick to match frames of 120
-		if dt < 1/120 then
-			love.timer.sleep(1/120 - dt)
-			--print(dt, " -> ", 1/120)
-			 --/120
-		end
-
-		if math.floor(tickCount) == math.floor(tickCount*100)/100 then
-			print(tickCount/timer)
-		end
-
-		dt = 1/120]]
-
 		
-		--print(tickCount/timer)
+    	if FPSlogicTimer >0.6 then
+			FPSlogicActual = math.floor(tickCount/FPSlogicTimer+0.5)
+		end
 
-		deliveryTimer = deliveryTimer - 1/FPStarget
+		--print(tickCount, FPSlogicActual)
+
+		deliveryTimer = deliveryTimer - 1/FPSlogicActual
 
 		for connectionIndex, connection in ipairs(connections) do
 			if connection.moving ~= true then
-				connection.sendTimer = connection.sendTimer - 1/FPStarget
+				connection.sendTimer = connection.sendTimer - 1/FPSlogicActual
 			end
 		end
 
@@ -421,7 +409,7 @@ function love.update(dt)
 		glowDelivery()
 
 
-		accumulator = accumulator - 1/FPStarget
+		accumulator = accumulator - 1/FPSlogicTarget
   	end
 end
 
@@ -924,13 +912,13 @@ function love.draw(mouseX, mouseY)
 
 
 
-	love.graphics.setFont(font20)
+	love.graphics.setFont(font14)
 
 	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)
 
-	love.graphics.print("Forced FPS:"..FPStarget, 150, 10)
+	love.graphics.print("Logic updates per second: "..FPSlogicActual.."/"..FPSlogicTarget, 120, 10)
 
-	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 350, 10)
+	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 10)
 
 
 	--highlight
@@ -1175,9 +1163,38 @@ function love.draw(mouseX, mouseY)
 		
 
 		-- draw population number
-		love.graphics.setFont(font20)  -- To-Do: make font bold
+		love.graphics.setFont(nodefont)  -- To-Do: make font bold
 		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-18, 2*nodeTiers[node.tier].radius, "center")
+		love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
+
+
+		--used and available tentacles
+		if node.team > 1 then -- move this to include population number later, so it doesnt show on grey nodes either
+			for i = 1, nodeTiers[node.tier].maxTentacles do
+
+
+				if i <= node.tentaclesUsed then
+					love.graphics.setColor(0,0,0)
+				else
+					love.graphics.setColor(teamColours[1])
+				end
+
+				-- 1/1 = 0  -   1/2 = -1,  2/2 = 1    -    1/3 = -2,  2/3 = 0,  3/3 = 2
+
+				-- a-b=0 		-1 			0  				-2 			-1 			0
+
+				-- (a-b) * 2 +b-1 - works!
+
+
+
+				love.graphics.circle('fill', node.x + 3.8*((i-nodeTiers[node.tier].maxTentacles)*2 + nodeTiers[node.tier].maxTentacles -1)  , node.y+12, linkRadius-3)     
+
+
+				--border
+				love.graphics.setColor(1,1,1)
+				love.graphics.circle('line', node.x + 3.8*((i-nodeTiers[node.tier].maxTentacles)*2 + nodeTiers[node.tier].maxTentacles -1)  , node.y+12, linkRadius-3)
+			end
+		end
 	end
 
 	
