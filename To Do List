@@ -6,15 +6,19 @@ To Do List
 
 -	Add ping effect on tier and team (and connection?) change
 
--	add Ant wobblers and feelers
+-	fix feelers to arc correctly
 
--	adjust wobbler timings to be more chaotic, paterns easily spottable
-
--	add predator wobblers
+-	correct predator wobblers movement,
 
 -	find solution for if the game cant garuantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
 
 -	adjust delivery speeds
+
+- 	use points to add more effects e.g. circling tentacles or nodes
+
+-	add little arrow when making yellow line
+
+-	fix the extra used connection issue that sometimes occurs
 
 
 Later goals

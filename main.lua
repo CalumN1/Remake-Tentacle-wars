@@ -1138,7 +1138,7 @@ function love.draw(mouseX, mouseY)
 				elseif node.tier > 2 then
 
 					--node first inner wobblers
-					local InnerWobblerRadius = 3.4*(math.sin((timer+(3*nodeIndex+i*(3*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2)
+					local InnerWobblerRadius = 3.4*(math.sin((timer+(3*nodeIndex+i*(3*(i+1.1))%1.38)%1)*2*math.pi)+2)
 					love.graphics.setColor(teamColours[node.team])
 					love.graphics.circle('fill', node.x, node.y-nodeTiers[node.tier].radius, InnerWobblerRadius)
 					--print(timer)
@@ -1177,24 +1177,26 @@ function love.draw(mouseX, mouseY)
 							if node.tier == 6 then --Predator
 
 								
-
+								-- each wobbler gets 3 side wobblers around it
 								for b = 1,3 do
 
+									-- side wobbler
 									love.graphics.setColor(teamColours[node.team])
-									love.graphics.circle('fill',node.x-(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
-										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi)+2))
-									
+									love.graphics.circle('fill',node.x-(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
+									-- border
 									love.graphics.setColor(1, 1, 1)
-									love.graphics.circle('line',node.x-(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
-										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi)+2))
+									love.graphics.circle('line',node.x-(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
 
-
+									--testing points
 									for a = 1, 24 do
-										love.graphics.points(node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*30, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(4-InnerWobblerRadius/3))*1) - InnerWobblerRadius -10)
+										--love.graphics.points(node.x-(math.sin(((a)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										--node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8)
 										--love.graphics.circle('line',node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-5, 5)
 									end
 
-									--rotate the whole screen centred on the node, redraw the feeler
+									--rotate the whole screen centred on the wobbler
 									love.graphics.translate(node.x, node.y-nodeTiers[node.tier].radius)
 									love.graphics.rotate(math.pi/1.5)
 									love.graphics.translate(-node.x, -(node.y-nodeTiers[node.tier].radius))
@@ -1242,13 +1244,13 @@ function love.draw(mouseX, mouseY)
 
 						--outer wobblers
 							love.graphics.setColor(teamColours[node.team])
-							love.graphics.circle('fill', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
-							love.graphics.circle('fill', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+							love.graphics.circle('fill', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('fill', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
 
 							--border
 							love.graphics.setColor(1, 1, 1)
-							love.graphics.circle('line', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
-							love.graphics.circle('line', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+							love.graphics.circle('line', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('line', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
 						
 
 					end
