@@ -2,8 +2,8 @@ function love.conf(t)
 
     -- https://love2d.org/wiki/Config_Files
 
-    t.window.width = 1200
-    t.window.height = 900
+    t.window.width = 1440
+    t.window.height = 1080
 
     t.modules.joystick = false
     t.modules.physics = false

@@ -8,8 +8,11 @@ io.stdout:setvbuf('no')
 -- This function gets called only once, when the game is started, and is usually where you would load resources, initialize variables and set specific settings. 
 -- All those things can be done anywhere else as well, but doing them here means that they are done once only, saving a lot of system resources
 function love.load()
-	arenaWidth = 1200
-    arenaHeight = 900 -- changing this doesnt do anything? need to at least change conf file too
+	arenaWidth = 1440
+    arenaHeight = 1080 -- changing this doesnt do anything? need to at least change conf file too
+
+
+    my_background = love.graphics.newImage('TwarsBackgroundClean.png')
 
     nodeMapWidth = 1200
 	nodeMapHeight = 900
@@ -55,7 +58,7 @@ function love.load()
             x = arenaWidth / 3,
             y = 150,
             team = 2,  -- team starts from 0 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-            population = 10,
+            population = 140,
             tier = 1,
             regenTimer = 5,
             tentaclesUsed = 0
@@ -157,10 +160,10 @@ function love.load()
     nodeTiers = { --Tiers change when the population exceeds the min or max
     	--node.tier is the index of the relevant ranges
     	-- In the game, lower tiers generate faster
-    	{min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1, maxTentacles = 1}, -- spore regen: 0 tents:18 in 40s	1:8		2:-	delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
-    	{min = 6, max = 39, radius = 36, regenDelay =  2.3, sendDelay = 1, maxTentacles = 2}, -- embryo					17			9		4				37
+    	{min = -20, max = 14, radius = 33, regenDelay =  1, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+    	{min = 6, max = 39, radius = 36, regenDelay =  2.3, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
     	{min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
-    	{min = 61, max = 119, radius = 47, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
+    	{min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
     	{min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
     	{min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
     }	-- regen halfs per tentacle roughly
@@ -337,8 +340,14 @@ function love.update(dt)
 	end
 	FPSlogicTimer = FPSlogicTimer + dt
 
+	for nodeIndex, node in ipairs(nodes) do
+		if node.team > 1 then
+			node.regenTimer = node.regenTimer - dt
+		end
+	end
+
 	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, maybe add a check for if the accumulator gets too high causing the game to be superfast for too long
-  	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run 
+  	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run target
 
     	tickCount = tickCount + 1
 		
@@ -362,9 +371,13 @@ function love.update(dt)
 		 	-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
 		for nodeIndex, node in ipairs(nodes) do
 			if node.team > 1 then
-				node.regenTimer = node.regenTimer - dt
-				if node.regenTimer < 0 then
-					node.regenTimer = nodeTiers[node.tier].regenDelay
+				if node.regenTimer < 0 then --regentimer updates EVERY loop not every logic update
+					if node.population < 5 then
+						node.regenTimer = nodeTiers[node.tier].regenDelay
+					else	
+						node.regenTimer = nodeTiers[node.tier].regenDelay*(2^node.tentaclesUsed)
+						--print(2^node.tentaclesUsed)
+					end
 					node.population = node.population +1
 				end
 			end
@@ -372,11 +385,11 @@ function love.update(dt)
 			-- tier change
 			if node.population > nodeTiers[node.tier].max then  -- add a white growing fading circle effect from edge when tiering up or down, or sending a tentacle, team changing, recalling as cant reach
 				node.tier = node.tier + 1
-				print("Tier UP!")
+				--print("Tier UP!")
 				--node
 			elseif node.population < nodeTiers[node.tier].min then
 				node.tier = node.tier -1
-				print("Tier down")
+				--print("Tier down")
 			end
 
 			if node.population > 200 then
@@ -593,6 +606,7 @@ function updateMovingConnections()
 
 			if nodes[connection.source].population == 0 and connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3 then
 				connection.destination = 0
+				nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 				nodes[connection.source].population = nodes[connection.source].population + 1
 				if connection.destination == 1 then
 					connections[connection.opposedConnectionIndex].destination = 2
@@ -628,7 +642,9 @@ function glowDelivery()
 					if nodes[connection.target].team ~= connection.team then
 						nodes[connection.target].population = nodes[connection.target].population - 1
 					else
-						nodes[connection.target].population = nodes[connection.target].population + 1
+						if nodes[connection.target].population < 200 then
+							nodes[connection.target].population = nodes[connection.target].population + 1
+						end
 					end
 					table.remove(connection.glowing, glowerIndex)
 
@@ -639,9 +655,11 @@ function glowDelivery()
 							if connection2.source == connection.target then
 								connection2.destination = 0
 								connection2.moving = true
-								connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
-								connections[connection2.opposedConnectionIndex].moving = true
-								connections[connection2.opposedConnectionIndex].destination = 2
+								if connection2.opposedConnectionIndex > 0 then
+									connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+									connections[connection2.opposedConnectionIndex].moving = true
+									connections[connection2.opposedConnectionIndex].destination = 2
+								end
 								connection2.opposedConnectionIndex = 0
 							end
 						end
@@ -654,7 +672,7 @@ function glowDelivery()
 
 			if connection.moving ~= true then
 				--print("check")
-				if connection.sendTimer < 0 then
+				if connection.sendTimer < 0 and nodes[connection.source].population > 4 then
 					
 					table.insert(connection.glowing, #connection.links)
 					connection.sendTimer = nodeTiers[nodes[connection.source].tier].sendDelay + connection.sendTimer
@@ -834,6 +852,7 @@ function love.mousereleased(mouseX, mouseY)
 				if (connection.destination == 1 or (connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3))  then 
 					-- go home
 					connection.destination = 0
+					nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 					if connection.opposedConnectionIndex > 0 then
 						connection.opposedConnectionIndex = 0
 						print(connectionIndex, connection.opposedConnectionIndex)
@@ -842,6 +861,7 @@ function love.mousereleased(mouseX, mouseY)
 				elseif connection.destination == 2 then
 					-- initiate split!
 					connection.destination = 3 
+					nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 					splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
 					nodes[connection.target].population = nodes[connection.target].population + 1
 					print(connection.splitLink," links: ", #connection.links)
@@ -910,6 +930,9 @@ end
 
 function love.draw(mouseX, mouseY)
 
+	love.graphics.setBackgroundColor(1,1,1)
+	love.graphics.setColor(1,1,1,1)
+	love.graphics.draw(my_background)
 
 
 	love.graphics.setFont(font14)
@@ -1115,19 +1138,21 @@ function love.draw(mouseX, mouseY)
 				elseif node.tier > 2 then
 
 					--node first inner wobblers
+					local InnerWobblerRadius = 3.4*(math.sin((timer+(3*nodeIndex+i*(3*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2)
 					love.graphics.setColor(teamColours[node.team])
-					love.graphics.circle('fill', node.x, node.y-nodeTiers[node.tier].radius, 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+					love.graphics.circle('fill', node.x, node.y-nodeTiers[node.tier].radius, InnerWobblerRadius)
+					--print(timer)
 					--border
 					love.graphics.setColor(1, 1, 1)
-					love.graphics.circle('line', node.x, node.y-nodeTiers[node.tier].radius, 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+					love.graphics.circle('line', node.x, node.y-nodeTiers[node.tier].radius, InnerWobblerRadius)
 
 					if node.tier ~= 5 then
 					--node feelers
-						love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2), 
-							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
-							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
-							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2),
-							node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1.1)*2*math.pi)+2))
+						love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius)
 					
 
 						
@@ -1135,30 +1160,108 @@ function love.draw(mouseX, mouseY)
 						if node.tier > 3 then
 							--outer wobblers
 							love.graphics.setColor(teamColours[node.team])
-							love.graphics.circle('fill', node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1)*2*math.pi)+2),
+							love.graphics.circle('fill', node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
 								linkRadius-2)
 							--border
 							love.graphics.setColor(1, 1, 1)
-							love.graphics.circle('line',  node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - 3.3*(math.sin((timer+(nodeIndex*(i+1.1)%2.38)%1)*2*math.pi)+2),
+							love.graphics.circle('line',  node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
 								linkRadius-2)
 							
+							--fix outer wobbler to follow this path:    --TODO
+							--[[for a = 1, 24 do
+								love.graphics.points(node.x-(math.sin(((a)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((a)%0.8)*2.5*math.pi))*1)*1))
+							end]]
 
+
+
+							if node.tier == 6 then --Predator
+
+								
+
+								for b = 1,3 do
+
+									love.graphics.setColor(teamColours[node.team])
+									love.graphics.circle('fill',node.x-(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi)+2))
+									
+									love.graphics.setColor(1, 1, 1)
+									love.graphics.circle('line',node.x-(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(b*i*nodeIndex/2.5)+b+i/1.9)%1.6)*1.25*math.pi)+2))
+
+
+									for a = 1, 24 do
+										love.graphics.points(node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*30, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(4-InnerWobblerRadius/3))*1) - InnerWobblerRadius -10)
+										--love.graphics.circle('line',node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-5, 5)
+									end
+
+									--rotate the whole screen centred on the node, redraw the feeler
+									love.graphics.translate(node.x, node.y-nodeTiers[node.tier].radius)
+									love.graphics.rotate(math.pi/1.5)
+									love.graphics.translate(-node.x, -(node.y-nodeTiers[node.tier].radius))
+
+									
+								end
+
+
+							end
 
 						end
 
 					elseif node.tier == 5 then --ant - 2 feelers each and basic extra wobblers
 
+						--rotate the whole screen centred on the node, redraw the feeler
+						love.graphics.translate(node.x-2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
+						love.graphics.rotate(-0.45)
+						love.graphics.translate(-(node.x-2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
+
+						love.graphics.line(node.x-2.5, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
+						node.x-2-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
+						node.x-1-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
+						node.x-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
+						node.x-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
+
+						love.graphics.translate(node.x-2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
+						love.graphics.rotate(0.45)
+						love.graphics.translate(-(node.x-2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
+
+						love.graphics.translate(node.x+2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
+						love.graphics.rotate(0.45)
+						love.graphics.translate(-(node.x+2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
+
+						love.graphics.line(node.x+2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius, 
+						node.x+2+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
+						node.x+1+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
+						node.x+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
+						node.x+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
+
+						--rotate back to where we started this loop 
+						love.graphics.translate(node.x+2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
+						love.graphics.rotate(-0.45)
+						love.graphics.translate(-(node.x+2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
+
+
+						--outer wobblers
+							love.graphics.setColor(teamColours[node.team])
+							love.graphics.circle('fill', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+							love.graphics.circle('fill', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+
+							--border
+							love.graphics.setColor(1, 1, 1)
+							love.graphics.circle('line', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+							love.graphics.circle('line', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1.25)*1.6*math.pi)+2))
+						
+
 					end
 
 				end
 
-				--rotate the whole screen centred on the node, redraw the feeler
+				--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
 				love.graphics.translate(node.x, node.y)
 				love.graphics.rotate(math.pi/4)
 				love.graphics.translate(-node.x, -node.y) -- I think this sets the origin back to 0,0 but with everything now rotated
 			end
 		end
-		-- unrotates and resets origin
+		-- unrotates and resets origin  -- maybe not necessary since we should be back round 360 anyway but we'll play it safe
 		love.graphics.origin()
 		
 

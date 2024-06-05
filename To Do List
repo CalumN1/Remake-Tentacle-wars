@@ -4,8 +4,6 @@ To Do List
 
 -	fix initial connection edges with extraspacing variable
 
--	Fix connecitons used - regain when connection broken
-
 -	Add ping effect on tier and team (and connection?) change
 
 -	add Ant wobblers and feelers
@@ -16,6 +14,15 @@ To Do List
 
 -	find solution for if the game cant garuantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
 
--	fix above 200 population flicker
+-	adjust delivery speeds
 
--	make generation half per used tentacle
+
+Later goals
+
+-	create a levels file with sets of node tables
+
+-	create a menu
+
+-	create an editor that can permenantly save to the levels file
+
+-	the editor should use a GUI
