@@ -1,6 +1,6 @@
 io.stdout:setvbuf('no')
 
--- require "cards"  -- separate file, do this for each seperate file, not conf or main tho
+require "levels"  -- separate file, do this for each seperate file, not conf or main tho
 
 --https://love2d.org/wiki/Optimising
 
@@ -11,6 +11,7 @@ function love.load()
 	arenaWidth = 1440
     arenaHeight = 1080 -- changing this doesnt do anything? need to at least change conf file too
 
+    levels = levels(arenaWidth,arenaHeight)
 
     my_background = love.graphics.newImage('TwarsBackgroundClean.png')
 
@@ -18,6 +19,10 @@ function love.load()
 	nodeMapHeight = 900
 
 	timer = 0
+
+	mousePosDelay = {x=0,y=0} --index = how many seconds ago it was there
+	mouseDelayTimer = 0
+	mouseEffectPoints = {{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0}}
 
     love.graphics.setBackgroundColor( 0., 0.1, 0.)
 
@@ -160,14 +165,37 @@ function love.load()
     nodeTiers = { --Tiers change when the population exceeds the min or max
     	--node.tier is the index of the relevant ranges
     	-- In the game, lower tiers generate faster
-    	{min = -20, max = 14, radius = 33, regenDelay =  1, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
-    	{min = 6, max = 39, radius = 36, regenDelay =  2.3, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
+    	{min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+    	{min = 6, max = 39, radius = 36, regenDelay =  2.4, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
     	{min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
     	{min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
     	{min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
     	{min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
     }	-- regen halfs per tentacle roughly
 
+    buttons = {
+    	{name = "Levels", x=10,y=30, width=50, height=30},
+    	{name = "1", x=50,y=100, width=30, height=30},
+    	{name = "2", x=100,y=100, width=30, height=30},
+    	{name = "3", x=150,y=100, width=30, height=30},
+    	
+    }
+
+    buttonsOnScreen = { {name = "Levels", x=10,y=30, width=50, height=30} }
+
+    function isMouseInButton()
+        
+    	for buttonIndex, button in ipairs(buttonsOnScreen) do
+	    	if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height then
+				print("Button ", buttonIndex, " activated!")
+				return buttonIndex
+			end
+
+		end
+
+		return 0
+        -- return button selected
+    end
 
 
     function isMouseInNode()
@@ -183,6 +211,8 @@ function love.load()
 
         -- return nodeSelected
     end
+
+
 
 
 end
@@ -363,6 +393,20 @@ function love.update(dt)
 			if connection.moving ~= true then
 				connection.sendTimer = connection.sendTimer - 1/FPSlogicActual
 			end
+		end
+
+		--mouse effects
+		if FPSlogicTimer > 0.1*(mouseDelayTimer%10) then
+			for timercounter = 10, 2 do
+				mousePosDelay[timercounter] = mousePosDelay[timercounter-1]
+			end
+			mousePosDelay[1] = {x = love.mouse.getX(), y = love.mouse.getY()}
+			mouseDelayTimer = mouseDelayTimer+1
+
+			for pointIndex, points in ipairs(mouseEffectPoints) do
+				points = {points.x + (mousePosDelay.x - points.x)/40 , points.y + (mousePosDelay.y - points.y)/40}
+			end
+
 		end
 
 		-- print(timer)
@@ -898,19 +942,6 @@ function love.mousereleased(mouseX, mouseY)
 end
 
 
-function newRound() -- consider moving whole function into load function? like inNode() ?
-
-	-- New round
-
-	
-
-	-- regeneration
-	for nodeIndex, node in ipairs(nodes) do
-		
-	end
-
-end
-
 
 
 function love.mousepressed(mouseX, mouseY)
@@ -923,7 +954,36 @@ function love.mousepressed(mouseX, mouseY)
 		pointSelected = 0
 	end
 
+	local buttonSelected = isMouseInButton()
 
+	if buttonSelected > 1 then
+		nodes = levels[buttonSelected-1]  -- not resetting when switching
+		connections = {}
+	elseif buttonSelected == 1 then
+		print(#buttonsOnScreen)
+		if #buttonsOnScreen < 3 then
+			for b = 2, #buttons do
+				table.insert(buttonsOnScreen, buttons[b])
+			end
+		else
+			for b = #buttonsOnScreen, 2, -1 do
+				table.remove(buttonsOnScreen, b) 
+				print("Removed: ", b, #buttonsOnScreen)
+			end
+		end
+	else
+
+
+	end
+
+
+end
+
+function mouseEffect()
+
+	for pointsIndex, points in ipairs(mouseEffectPoints) do 
+		love.graphics.points(points.x +5*math.sin(timer%2*math.pi), points.y+5*math.cos(timer%2*math.pi))
+	end
 end
 
 
@@ -934,14 +994,26 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setColor(1,1,1,1)
 	love.graphics.draw(my_background)
 
-
 	love.graphics.setFont(font14)
 
+	for buttonIndex, button in ipairs(buttonsOnScreen) do
+		love.graphics.setColor(0.5,0,0.5)
+		love.graphics.rectangle('fill',button.x,button.y,button.width, button.height)
+		love.graphics.setColor(1,1,1)
+		love.graphics.print(button.name,button.x,button.y)
+	end
+
+
+	
+	love.graphics.setColor(1,1,1,1)
 	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)
 
 	love.graphics.print("Logic updates per second: "..FPSlogicActual.."/"..FPSlogicTarget, 120, 10)
 
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 10)
+
+
+	mouseEffect()
 
 
 	--highlight
@@ -1305,11 +1377,34 @@ function love.draw(mouseX, mouseY)
 	
 	-- draw line between mouse and NODE after node selected, before release
 	love.graphics.setColor(0.8, 0.8, 0)
+	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
 		if nodeSelected > 0 and pointSelected == 0 then
 			love.graphics.setColor(0.8, 0.8, 0)
-			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY())
 			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
+
+			local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
+			print(angle/(2*math.pi) )
+
+			--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
+			love.graphics.translate(love.mouse.getX(), love.mouse.getY())
+			love.graphics.rotate(-angle)
+
+
+
+			love.graphics.line(0,0,-10,10)
+			love.graphics.circle('fill',-10,10,2.5)
+			love.graphics.line(0,0,-10,-10)
+			love.graphics.circle('fill',-10,-10,2.5)
+
+			love.graphics.translate(-love.mouse.getX(), -love.mouse.getY())
+
+			-- unrotates and resets origin  
+			love.graphics.origin()
+
+
+			--love.graphics.line(500,0,500,500)
+
 		else
 			love.graphics.setColor(0.8, 0, 0)
 			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
