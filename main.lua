@@ -116,6 +116,23 @@ function love.load()
         },
     }
 
+    walls = {
+    	{
+    		startX = arenaWidth/2,
+    		startY = 500,
+    		endX = 50,
+    		endY = arenaHeight/2
+    	},
+    	{
+    		startX = arenaWidth/3,
+    		startY = 900,
+    		endX = arenaWidth/2,
+    		endY = 600
+    	}
+
+
+    }
+
     connections = {
        --[[ {
             population = 2,
@@ -1374,6 +1391,77 @@ function love.draw(mouseX, mouseY)
 		end
 	end
 
+	-- draw all walls
+	for wallIndex, wall in ipairs(walls) do
+		
+		--love.graphics.line(wall.startX, wall.startY,wall.endX, wall.endY)
+		--love.graphics.polygon('fill', wall.startX, wall.startY-20, 20,20, wall.endX, wall.endY+50)
+		--print("WALL", wallIndex)  (wall.startX+wall.endX)/2, (wall.startY+wall.endY)/2
+
+		local angle = calculateSourceYAngleAny({x = wall.endX, y = wall.endY}, {x = wall.startX, y = wall.startY} )
+			
+		--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
+		love.graphics.translate(wall.startX, wall.startY)
+		love.graphics.rotate(-angle)
+		local distanceDiff = -distancebetween(wall.endX, wall.endY, wall.startX, wall.startY)
+
+		--love.graphics.line(0, 10,4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2,4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2,0,-10)
+		--love.graphics.line(distanceDiff, 10,distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, 2, distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, -2, distanceDiff, -10)
+				 
+		--[[love.graphics.line(0,10, 
+			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
+			distanceDiff/1.1 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff, 10)
+
+		--love.graphics.line(0,-10, 
+			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
+			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff, -10)]]
+
+		local wallPoints = {
+			0,10, -- wall.startX, wall.startY
+			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
+			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
+			distanceDiff/1.1 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff, 10,
+
+			distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, --wall-end, end side
+			2, distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, 
+			-2, distanceDiff, -10,
+
+			
+			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
+			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
+			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			0,-10,
+
+			
+			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2, --wall-end, start side
+			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2
+		
+		}
+
+		love.graphics.setLineWidth( 2 )
+		love.graphics.setColor(0.3,0.3,0.1)
+		love.graphics.polygon('fill', wallPoints)
+		--border
+		love.graphics.setColor(1,1,1)
+		love.graphics.polygon('line', wallPoints)
+
+
+
+
+		love.graphics.translate(-wall.startX, -wall.startY)
+
+		--love.graphics.line(wall.startX, wall.startY,-10,-10)
+
+		-- unrotates and resets origin  
+		love.graphics.origin()
+	end
+	
+
 	
 	-- draw line between mouse and NODE after node selected, before release
 	love.graphics.setColor(0.8, 0.8, 0)
@@ -1384,13 +1472,13 @@ function love.draw(mouseX, mouseY)
 			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
 
 			local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
-			print(angle/(2*math.pi) )
+			--print(angle/(2*math.pi) )
 
 			--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
 			love.graphics.translate(love.mouse.getX(), love.mouse.getY())
 			love.graphics.rotate(-angle)
 
-
+			love.graphics.line(0, 0,0,50)
 
 			love.graphics.line(0,0,-10,10)
 			love.graphics.circle('fill',-10,10,2.5)
