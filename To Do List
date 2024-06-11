@@ -4,8 +4,6 @@ To Do List
 
 -	fix initial connection edges with extraspacing variable
 
--	Add ping effect on tier and team (and connection?) change
-
 -	fix feelers to arc correctly
 
 -	find solution for if the game cant garuantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
@@ -14,13 +12,13 @@ To Do List
 
 - 	use points to add more effects e.g. circling tentacles or nodes
 
--	fix the extra used connection issue that sometimes occurs
+-	fix walls: fill shape different from border shape ????
 
--	fix walls, fill shape different from border shape ????
+-	Add an enemy AI !
 
 Later goals
 
--	create a levels file with sets of node tables
+-	create more levels
 
 -	create a menu
 

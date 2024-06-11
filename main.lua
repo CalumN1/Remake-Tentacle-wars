@@ -66,7 +66,8 @@ function love.load()
             population = 140,
             tier = 1,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
             -- regen Delay comes from the tiers table now
         },
         {
@@ -76,7 +77,8 @@ function love.load()
             population = 20,
             tier = 2,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
         },
         {
             x = 200,
@@ -85,7 +87,8 @@ function love.load()
             population = 40,
             tier = 3,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
         },
         {
             x = 400,
@@ -94,7 +97,8 @@ function love.load()
             population = 80,
             tier = 4,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
         },
         {
             x = arenaWidth / 1.5,
@@ -103,7 +107,8 @@ function love.load()
             population = 120,
             tier = 5,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
         },
         {
             x = arenaWidth - 200,
@@ -112,7 +117,8 @@ function love.load()
             population = 180,
             tier = 6,
             regenTimer = 5,
-            tentaclesUsed = 0
+            tentaclesUsed = 0,
+            effectTimer = 0 
         },
     }
 
@@ -391,7 +397,13 @@ function love.update(dt)
 		if node.team > 1 then
 			node.regenTimer = node.regenTimer - dt
 		end
+		if node.effectTimer > 0 then
+			node.effectTimer = node.effectTimer - dt
+		end
 	end
+
+
+
 
 	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, maybe add a check for if the accumulator gets too high causing the game to be superfast for too long
   	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run target
@@ -446,10 +458,12 @@ function love.update(dt)
 			-- tier change
 			if node.population > nodeTiers[node.tier].max then  -- add a white growing fading circle effect from edge when tiering up or down, or sending a tentacle, team changing, recalling as cant reach
 				node.tier = node.tier + 1
+				node.effectTimer = 0.5
 				--print("Tier UP!")
 				--node
 			elseif node.population < nodeTiers[node.tier].min then
 				node.tier = node.tier -1
+				node.effectTimer = 0.5
 				--print("Tier down")
 			end
 
@@ -635,6 +649,8 @@ function updateMovingConnections()
 								nodes[connection.target].population = nodes[connection.target].population - 1
 								if nodes[connection.target].population < 0 then
 									nodes[connection.target].team = connection.team 
+									nodes[connection.target].effectTimer = 0.5
+									nodes[connection.target].tentaclesUsed = 0 
 									nodes[connection.target].population = math.abs(nodes[connection.target].population)
 									for connectionIndex2, connection2 in ipairs(connections) do
 										if connection2.source == connection.target then
@@ -709,9 +725,13 @@ function glowDelivery()
 					end
 					table.remove(connection.glowing, glowerIndex)
 
+					-- convert team through glow delivery
 					if nodes[connection.target].population < 0 then
-						nodes[connection.target].team = connection.team 
+						nodes[connection.target].team = connection.team
+						nodes[connection.target].effectTimer = 0.5
+						nodes[connection.target].tentaclesUsed = 0 
 						nodes[connection.target].population = math.abs(nodes[connection.target].population)
+						-- if dead node has other tentacles out, retract them
 						for connectionIndex2, connection2 in ipairs(connections) do
 							if connection2.source == connection.target then
 								connection2.destination = 0
@@ -766,6 +786,7 @@ function checkOpposedConnections()
 						connection2.destination = 2
 
 						nodes[connection1.source].population = nodes[connection1.source].population + 1
+						nodes[connection1.source].tentaclesUsed = nodes[connection1.source].tentaclesUsed - 1
 					else
 						--do nothing, the above will trigger in a later loop
 
@@ -837,69 +858,92 @@ function love.mousereleased(mouseX, mouseY)
 	and nodes[nodeSelected].population > 0
 	and nodes[nodeSelected].tentaclesUsed < nodeTiers[nodes[nodeSelected].tier].maxTentacles
 	then
-
-		local edges = calculateNodeEdges(nodeSelected, releasenode)
-
-		local numLinksToMake = 1+ math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
-		local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
-		extraSpacing = extraSpacing/numLinksToMake
-
-		local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
-
-		--print(calculateSourceYAngle(nodeSelected, releasenode))
-
-		-- connection creation with no links
-		table.insert(connections, {	
-			population = nodes[nodeSelected].population, team = nodes[nodeSelected].team, moving = true, source = nodeSelected, 
-			sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
-			target = releasenode,
-            targetEdge = {
-            	x = edges.targetX, 
-            	y = edges.targetY
-            },
-            tentacleEnd = {
-            	x = edges.sourceX, 
-            	y = edges.sourceY
-            },
-            connectionMidPoint = {
-            	x = (edges.sourceX + edges.targetX)/2,
-            	y = (edges.sourceY + edges.targetY)/2
-            },
-            linkXStep = linkSteps.x,
-            linkYStep = linkSteps.y,
-            links = {
-            },
-            destination = 2,
-            opposedConnectionIndex= 0,
-            splitLink = 0,
-            glowing = {},
-            sendTimer = nodeTiers[nodes[nodeSelected].tier].sendDelay
-		})
-
-		-- link creation
-			--loops from 1 to number of nodes that would fit in the distance 
-
-		-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
-		--for i = 1, 1 do numLinksToMake+1 do
-
-
-		table.insert(connections[#connections].links, {
-			x = edges.sourceX,
-			y = edges.sourceY
-		})
-		nodes[nodeSelected].population = nodes[nodeSelected].population -1
-		
-		nodes[nodeSelected].tentaclesUsed = nodes[nodeSelected].tentaclesUsed + 1
-
-		tentacleEnd = connections[#connections].links[1]
-		
-		-- print every current connection
-		for connectionIndex, connection in ipairs(connections) do
-			print(connection.source, " -> ", connection.target)
+		-- check for wall intersection
+		local wallIntersection = false
+		for wallIndex, wall in ipairs(walls) do 
+			ix, iy = findIntersectionPoint(nodes[nodeSelected].x, nodes[nodeSelected].y, nodes[releasenode].x, nodes[releasenode].y, wall.startX, wall.startY, wall.endX, wall.endY)
+			if ix ~= nil and iy ~= nil then -- intersection exists
+				wallIntersection = true
+			end
 		end
-		print(" ------------------- ")
 
-		checkOpposedConnections()
+		-- check for duplicate connection
+		local connectionAlreadyExists = false
+		for connectionIndex, connection in ipairs(connections) do
+			if connection.source == nodeSelected and connection.target == releasenode then 
+				connectionAlreadyExists = true
+				print("ignored duplicate: ", connection.source, " -> ", connection.target)
+			end
+
+		end
+
+		if wallIntersection == false and connectionAlreadyExists == false then
+			local edges = calculateNodeEdges(nodeSelected, releasenode)
+
+			local numLinksToMake = 1+ math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
+			local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
+			extraSpacing = extraSpacing/numLinksToMake
+
+			local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
+
+			--print(calculateSourceYAngle(nodeSelected, releasenode))
+
+			-- connection creation with no links
+			table.insert(connections, {	
+				population = nodes[nodeSelected].population, team = nodes[nodeSelected].team, moving = true, source = nodeSelected, 
+				sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
+				target = releasenode,
+	            targetEdge = {
+	            	x = edges.targetX, 
+	            	y = edges.targetY
+	            },
+	            tentacleEnd = {
+	            	x = edges.sourceX, 
+	            	y = edges.sourceY
+	            },
+	            connectionMidPoint = {
+	            	x = (edges.sourceX + edges.targetX)/2,
+	            	y = (edges.sourceY + edges.targetY)/2
+	            },
+	            linkXStep = linkSteps.x,
+	            linkYStep = linkSteps.y,
+	            links = {
+	            },
+	            destination = 2,
+	            opposedConnectionIndex= 0,
+	            splitLink = 0,
+	            glowing = {},
+	            sendTimer = nodeTiers[nodes[nodeSelected].tier].sendDelay
+			})
+
+			-- link creation
+				--loops from 1 to number of nodes that would fit in the distance 
+
+			-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
+			--for i = 1, 1 do numLinksToMake+1 do
+
+
+			table.insert(connections[#connections].links, {
+				x = edges.sourceX,
+				y = edges.sourceY
+			})
+			nodes[nodeSelected].population = nodes[nodeSelected].population -1
+			
+			nodes[nodeSelected].tentaclesUsed = nodes[nodeSelected].tentaclesUsed + 1
+
+			tentacleEnd = connections[#connections].links[1]
+			
+			-- print every current connection
+			for connectionIndex, connection in ipairs(connections) do
+				print(connection.source, " -> ", connection.target)
+			end
+			print(" ------------------- ")
+
+			checkOpposedConnections()
+
+			--trigger ping effect from connection creation
+			nodes[nodeSelected].effectTimer = 0.5
+		end
 
 	-- cutting a connection
 	elseif (nodeSelected == 0 and pointSelected ~= 0) then
@@ -996,6 +1040,7 @@ function love.mousepressed(mouseX, mouseY)
 
 end
 
+
 function mouseEffect()
 
 	for pointsIndex, points in ipairs(mouseEffectPoints) do 
@@ -1038,6 +1083,18 @@ function love.draw(mouseX, mouseY)
 	if highlightedNode > 0 then
 		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
 		love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius)
+	end
+
+	-- node ping affect on change
+	-- effect timer counts down to 0 as the circle's radius increases and the circle fades out
+	for nodeIndex, node in ipairs(nodes) do
+		if node.effectTimer > 0 then
+			--timer updates in love.update
+			--print("EFFECT! ")
+			love.graphics.setColor(1, 1, 1, 2*node.effectTimer)
+			love.graphics.setLineWidth( (node.tier + 7/(node.effectTimer+0.5)) -4 ) --5-12
+			love.graphics.circle('line',node.x, node.y, nodeTiers[node.tier].radius+60*(0.5-node.effectTimer)*((nodeTiers[node.tier].radius)/35))
+		end
 	end
 
 

@@ -12,7 +12,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 60,
 		        tier = 3,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+		    	effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth -300, 
@@ -21,7 +22,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 3,
 		        tier = 1,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+		    	effectTimer = 0  
 		    }
 		},
 
@@ -34,7 +36,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 10,
 		        tier = 1,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth / 2 ,
@@ -43,7 +46,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 10,
 		        tier = 1,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth / 2+50,
@@ -52,7 +56,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 10,
 		        tier = 1,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth / 3.2 ,
@@ -61,7 +66,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 50,
 		        tier = 3,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth / 1.4 ,
@@ -70,7 +76,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 60,
 		        tier = 3,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		},
 
@@ -82,7 +89,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 50,
 		        tier = 3,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth/2.1, 
@@ -91,7 +99,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 20,
 		        tier = 2,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth/4, 
@@ -100,7 +109,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 20,
 		        tier = 2,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth/2.2, 
@@ -109,7 +119,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 20,
 		        tier = 2,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth/1.4, 
@@ -118,7 +129,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 20,
 		        tier = 2,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    },
 		    {
 		        x = arenaWidth/1.4, 
@@ -127,7 +139,8 @@ function levels(arenaWidth,arenaHeight)
 		        population = 20,
 		        tier = 2,
 		        regenTimer = 5,
-		        tentaclesUsed = 0
+		        tentaclesUsed = 0,
+			    effectTimer = 0  
 		    }
 		},
 	}
