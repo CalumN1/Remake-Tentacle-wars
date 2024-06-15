@@ -1,5 +1,5 @@
 --this goes into the nodes table
-function levels(arenaWidth,arenaHeight)
+function levelNodes(arenaWidth,arenaHeight)
 --level 1	
 	print("Levels ready... ")
 	return
@@ -146,9 +146,39 @@ function levels(arenaWidth,arenaHeight)
 	}
 end
 
+function levelWalls(arenaWidth,arenaHeight)
+
+	return
+	{
+		{ -- level 1
+		},
+		{ -- level 2
+		},
+		{ -- level 3
+			{
+	    		startX = arenaWidth/2.6,
+	    		startY = arenaHeight/1.1, --lower
+	    		endX = arenaWidth/3,
+	    		endY = arenaHeight/1.6
+    		},
+    		{
+	    		startX = arenaWidth/3,
+	    		startY = arenaHeight/1.6, --lower
+	    		endX = arenaWidth/2.5,
+	    		endY = arenaHeight/2.2
+    		},
+    		{
+	    		startX = arenaWidth/2.5,
+	    		startY = arenaHeight/2.2, --lower
+	    		endX = arenaWidth/1.9,
+	    		endY = arenaHeight/2.3
+    		}
+		},
 
 
+	}
 
+end
 
 
 

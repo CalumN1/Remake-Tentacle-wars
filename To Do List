@@ -14,11 +14,21 @@ To Do List
 
 -	fix walls: fill shape different from border shape ????
 
--	Add an enemy AI !
+-	slow down enemy AI !
+
+-	AI Improvements
+
+- 	fix new connection when recalling causes direction change 
+
+-	add upto level 5
+
+- 	add upto level 10
+
+-	add upto level 15
+
+-	add upto level 20
 
 Later goals
-
--	create more levels
 
 -	create a menu
 

@@ -11,7 +11,8 @@ function love.load()
 	arenaWidth = 1440
     arenaHeight = 1080 -- changing this doesnt do anything? need to at least change conf file too
 
-    levels = levels(arenaWidth,arenaHeight)
+    levelNodesTable = levelNodes(arenaWidth,arenaHeight)
+    levelWallsTable = levelWalls(arenaWidth,arenaHeight)
 
     my_background = love.graphics.newImage('TwarsBackgroundClean.png')
 
@@ -104,7 +105,7 @@ function love.load()
             x = arenaWidth / 1.5,
             y = nodeMapHeight - 200,
             team = 3,
-            population = 120,
+            population = 40,
             tier = 5,
             regenTimer = 5,
             tentaclesUsed = 0,
@@ -114,7 +115,7 @@ function love.load()
             x = arenaWidth - 200,
             y = nodeMapHeight - 500,
             team = 3,
-            population = 180,
+            population = 10,
             tier = 6,
             regenTimer = 5,
             tentaclesUsed = 0,
@@ -205,6 +206,20 @@ function love.load()
     }
 
     buttonsOnScreen = { {name = "Levels", x=10,y=30, width=50, height=30} }
+
+
+    -- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
+
+	-- NEW: table [1] is the distances from node 1 in order of distance, {distance, targetNode}. so when AI is looking at node 1's options look at if the distance: nodeDistances[1][1][2] is acceptable then create connection to node: nodeDistances[1][1][1]
+    -- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
+    -- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
+    -- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
+    nodeDistances = { 
+        	--[[ {  {2,261},{4,300},{3,500} },
+		{  {1,261},{4,350},{3,400} },     etc    ]]
+    }
+    calculateNodeDistances()
+
 
     function isMouseInButton()
         
@@ -478,8 +493,8 @@ function love.update(dt)
 
 
 
-		-- remove duplicate connections
-		for connectionIndex1, connection1 in ipairs(connections) do
+		-- remove duplicate connections -- replaced so they cant be created in the first place, the new check only runs on connection creation too
+		--[[for connectionIndex1, connection1 in ipairs(connections) do
 			for connectionIndex2, connection2 in ipairs(connections) do
 
 				if connection1.source == connection2.source and connection1.target == connection2.target and connectionIndex1 ~= connectionIndex2 then 
@@ -487,12 +502,16 @@ function love.update(dt)
 					print("removed duplicate: ", connection2.source, " -> ", connection2.target)
 				end
 			end
-		end
+		end]]
 		
 		-- move this to run only when a cut, node-loss, or new connection is made
 		checkOpposedConnections()
+
 		
-		updateMovingConnections()
+		
+		updateMovingConnections() --main update processes
+
+		enemyAI()
 
 		glowDelivery()
 
@@ -656,10 +675,13 @@ function updateMovingConnections()
 										if connection2.source == connection.target then
 											connection2.destination = 0
 											connection2.moving = true
-											connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
-											connections[connection2.opposedConnectionIndex].moving = true
-											connections[connection2.opposedConnectionIndex].destination = 2
-											connection2.opposedConnectionIndex = 0
+											if connection2.opposedConnectionIndex > 0 then
+												connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+												connections[connection2.opposedConnectionIndex].moving = true
+												connections[connection2.opposedConnectionIndex].destination = 2
+												connection2.opposedConnectionIndex = 0
+											end
+											
 										end
 									end
 								end
@@ -845,7 +867,75 @@ function splitTentacle(connectionIndex, ix, iy)
 
 end
 
+function createConnection(sourceNode, targetNode)
 
+	local edges = calculateNodeEdges(sourceNode, targetNode)
+
+	local numLinksToMake = 1+ math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
+	local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
+	extraSpacing = extraSpacing/numLinksToMake
+
+	local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
+
+	--print(calculateSourceYAngle(sourceNode, targetNode))
+
+	-- connection creation with no links
+	table.insert(connections, {	
+		population = nodes[sourceNode].population, team = nodes[sourceNode].team, moving = true, source = sourceNode, 
+		sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
+		target = targetNode,
+        targetEdge = {
+        	x = edges.targetX, 
+        	y = edges.targetY
+        },
+        tentacleEnd = {
+        	x = edges.sourceX, 
+        	y = edges.sourceY
+        },
+        connectionMidPoint = {
+        	x = (edges.sourceX + edges.targetX)/2,
+        	y = (edges.sourceY + edges.targetY)/2
+        },
+        linkXStep = linkSteps.x,
+        linkYStep = linkSteps.y,
+        links = {
+        },
+        destination = 2,
+        opposedConnectionIndex= 0,
+        splitLink = 0,
+        glowing = {},
+        sendTimer = nodeTiers[nodes[sourceNode].tier].sendDelay
+	})
+
+	-- link creation
+		--loops from 1 to number of nodes that would fit in the distance 
+
+	-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
+	--for i = 1, 1 do numLinksToMake+1 do
+
+
+	table.insert(connections[#connections].links, {
+		x = edges.sourceX,
+		y = edges.sourceY
+	})
+	nodes[sourceNode].population = nodes[sourceNode].population -1
+	
+	nodes[sourceNode].tentaclesUsed = nodes[sourceNode].tentaclesUsed + 1
+
+	tentacleEnd = connections[#connections].links[1]
+	
+	-- print every current connection
+	for connectionIndex, connection in ipairs(connections) do
+		print(connection.source, " -> ", connection.target)
+	end
+	print(" ------------------- ")
+
+	checkOpposedConnections()
+
+	--trigger ping effect from connection creation
+	nodes[sourceNode].effectTimer = 0.5
+
+end
 
 function love.mousereleased(mouseX, mouseY)
 
@@ -877,73 +967,11 @@ function love.mousereleased(mouseX, mouseY)
 
 		end
 
+		--create connection
 		if wallIntersection == false and connectionAlreadyExists == false then
-			local edges = calculateNodeEdges(nodeSelected, releasenode)
-
-			local numLinksToMake = 1+ math.floor((distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))/((2*linkRadius)+linkSpacing))
-			local extraSpacing = (distancebetween(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY))%((2*linkRadius)+linkSpacing)
-			extraSpacing = extraSpacing/numLinksToMake
-
-			local linkSteps = calculateSteps(edges.sourceX, edges.sourceY, edges.targetX, edges.targetY, extraSpacing)
-
-			--print(calculateSourceYAngle(nodeSelected, releasenode))
-
-			-- connection creation with no links
-			table.insert(connections, {	
-				population = nodes[nodeSelected].population, team = nodes[nodeSelected].team, moving = true, source = nodeSelected, 
-				sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
-				target = releasenode,
-	            targetEdge = {
-	            	x = edges.targetX, 
-	            	y = edges.targetY
-	            },
-	            tentacleEnd = {
-	            	x = edges.sourceX, 
-	            	y = edges.sourceY
-	            },
-	            connectionMidPoint = {
-	            	x = (edges.sourceX + edges.targetX)/2,
-	            	y = (edges.sourceY + edges.targetY)/2
-	            },
-	            linkXStep = linkSteps.x,
-	            linkYStep = linkSteps.y,
-	            links = {
-	            },
-	            destination = 2,
-	            opposedConnectionIndex= 0,
-	            splitLink = 0,
-	            glowing = {},
-	            sendTimer = nodeTiers[nodes[nodeSelected].tier].sendDelay
-			})
-
-			-- link creation
-				--loops from 1 to number of nodes that would fit in the distance 
-
-			-- now this just creates the first node, slightly problematic as i think this is the reason we have to -1 from the added population when connection cut
-			--for i = 1, 1 do numLinksToMake+1 do
-
-
-			table.insert(connections[#connections].links, {
-				x = edges.sourceX,
-				y = edges.sourceY
-			})
-			nodes[nodeSelected].population = nodes[nodeSelected].population -1
-			
-			nodes[nodeSelected].tentaclesUsed = nodes[nodeSelected].tentaclesUsed + 1
-
-			tentacleEnd = connections[#connections].links[1]
-			
-			-- print every current connection
-			for connectionIndex, connection in ipairs(connections) do
-				print(connection.source, " -> ", connection.target)
-			end
-			print(" ------------------- ")
-
-			checkOpposedConnections()
-
-			--trigger ping effect from connection creation
-			nodes[nodeSelected].effectTimer = 0.5
+			createConnection(nodeSelected, releasenode)
 		end
+
 
 	-- cutting a connection
 	elseif (nodeSelected == 0 and pointSelected ~= 0) then
@@ -954,52 +982,60 @@ function love.mousereleased(mouseX, mouseY)
 			ix, iy = findIntersectionPoint(connection.sourceEdge.x,connection.sourceEdge.y, connection.targetEdge.x,connection.targetEdge.y, pointSelected.x, pointSelected.y, releaseMouseX, releaseMouseY)
 			if ix ~= nil and iy ~= nil then -- intersection exists
 								
-				if (connection.destination == 1 or (connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3))  then 
-					-- go home
-					connection.destination = 0
-					nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
-					if connection.opposedConnectionIndex > 0 then
-						connection.opposedConnectionIndex = 0
-						print(connectionIndex, connection.opposedConnectionIndex)
-					end
-					nodes[connection.source].population = nodes[connection.source].population +1
-				elseif connection.destination == 2 then
-					-- initiate split!
-					connection.destination = 3 
-					nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
-					splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
-					nodes[connection.target].population = nodes[connection.target].population + 1
-					print(connection.splitLink," links: ", #connection.links)
-					if connection.splitLink < 1 then
-						connection.splitLink = 1
-					end
-					--print(connection.splitLink)
-					y = connection.links[connection.splitLink].x
-					if distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.sourceEdge.x, connection.sourceEdge.y) < --splitLink is the index
-						distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.targetEdge.x, connection.targetEdge.y) then
-						if nodes[connection.target].team == connection.team then --close to source
-							nodes[connection.source].population = nodes[connection.source].population +1
-							nodes[connection.target].population = nodes[connection.target].population - 2
-						else
-							nodes[connection.source].population = nodes[connection.source].population +1
-							nodes[connection.target].population = nodes[connection.target].population 
-						end
-					else
-						if nodes[connection.target].team == connection.team then --close to target
-							nodes[connection.source].population = nodes[connection.source].population +1
-							nodes[connection.target].population = nodes[connection.target].population - 2
-						else
-							nodes[connection.source].population = nodes[connection.source].population +1
-							nodes[connection.target].population = nodes[connection.target].population 
-						end
-					end
-				end
-
-				connection.moving = true --this triggers everything to start processing this tentacle again till resolved
+				cutConnection(connectionIndex, connection, ix, iy)
 
 			end
 		end
 	end
+end
+
+function cutConnection(connectionIndex, connection, ix, iy)
+
+	if (connection.destination == 1 or (connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3))  then 
+		-- go home
+		connection.destination = 0
+		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
+		if connection.opposedConnectionIndex > 0 then
+			connection.opposedConnectionIndex = 0
+			print(connectionIndex, connection.opposedConnectionIndex)
+		end
+		nodes[connection.source].population = nodes[connection.source].population +1
+	elseif connection.destination == 2 then
+		-- initiate split!
+		connection.destination = 3 
+		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
+		splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
+		nodes[connection.target].population = nodes[connection.target].population + 1
+		print(connection.splitLink," links: ", #connection.links)
+		if connection.splitLink < 1 then
+			connection.splitLink = 1
+		end
+		--print(connection.splitLink)
+		y = connection.links[connection.splitLink].x
+		if distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.sourceEdge.x, connection.sourceEdge.y) < --splitLink is the index
+			distancebetween(connection.links[connection.splitLink].x, connection.links[connection.splitLink].y, connection.targetEdge.x, connection.targetEdge.y) then
+			if nodes[connection.target].team == connection.team then --close to source
+				nodes[connection.source].population = nodes[connection.source].population +1
+				nodes[connection.target].population = nodes[connection.target].population - 2
+			else
+				nodes[connection.source].population = nodes[connection.source].population +1
+				nodes[connection.target].population = nodes[connection.target].population 
+			end
+		else
+			if nodes[connection.target].team == connection.team then --close to target
+				nodes[connection.source].population = nodes[connection.source].population +1
+				nodes[connection.target].population = nodes[connection.target].population - 2
+			else
+				nodes[connection.source].population = nodes[connection.source].population +1
+				nodes[connection.target].population = nodes[connection.target].population 
+			end
+		end
+	end
+
+	connection.moving = true --this triggers everything to start processing this tentacle again till resolved
+
+
+
 end
 
 
@@ -1017,9 +1053,15 @@ function love.mousepressed(mouseX, mouseY)
 
 	local buttonSelected = isMouseInButton()
 
+	--menu interactions
 	if buttonSelected > 1 then
-		nodes = levels[buttonSelected-1]  -- not resetting when switching
 		connections = {}
+		nodeDistances = {}
+		levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
+		nodes = levelNodesTable[buttonSelected-1] 
+		walls = levelWallsTable[buttonSelected-1] --walls dont change so no need to revert anything each time
+
+		calculateNodeDistances()
 	elseif buttonSelected == 1 then
 		print(#buttonsOnScreen)
 		if #buttonsOnScreen < 3 then
@@ -1037,6 +1079,167 @@ function love.mousepressed(mouseX, mouseY)
 
 	end
 
+
+end
+
+
+
+function enemyAI()
+
+	--wait 5 seconds before starting
+
+	-- attack closest node if it has at least half the targets population
+
+	-- sends at 60 vs 30
+	-- 60 vs 23 , opposes, recalls at 3
+	-- vs 20 opposes
+	-- vs 19 does not oppose
+	-- halfway = 7/8
+
+	-- distanced vs 24 opposes, half way = 10/11
+
+	--further and max 40, 40vs40 no send, responds 
+
+	-- 40 vs 10 close, sends at  20, opposes at 16, halfway =3/4
+	--10v10 max 20 never sends
+	-- close, 20vs20, sends at 22, opposes straight away 20, halfway =3/4
+	--close 10vs10, sends at  21, opposes at 16
+
+	--close 90vs20, sends at 22 aka 5 seconds, 
+	--close 200vs10, sends at 21, halfway 2/3
+
+	--far 200vs20, sends at 50, distance 32, opposses at 29
+	--slightly less far, sends at 45, distance 28 
+
+	-- 17 + distance?
+
+	--40vs 20 close-ish, distance 10, sends at 24  	14
+	--40vs20 further, distance 13 , sends at 29		15
+	--40vs20 further. distance 18 , sends at 33		15
+	--40vs30 further, distance 22, sends at 39		17
+
+	-- enemies always go for closest enemy node grey or green
+	-- then prioritises grey nodes over allies
+	-- red never buffs allies
+	-- purple buffs/attacks closest node, only buffs a node with less population
+	-- calls back when around 2 or 3
+	-- stays connected after taking over a node for a few (it varies) seconds then always splits, sometimes in the middle or at the end depending on population differences probably
+	-- doesnt make many moves at once, slow, but 1 or 2 nodes can do 2 things in quick succession but not all at once
+
+	
+	-- NEW: table [1] is the distances from node 1 in order of distance, {distance, targetNode}. so when AI is looking at node 1's options look at if the distance: nodeDistances[1][1][2] is acceptable then create connection to node: nodeDistances[1][1][1]
+    -- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
+    -- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
+    -- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
+
+
+	for nodeIndex, node in ipairs(nodes) do
+		if nodeIndex ~= 9 then
+			--only act for enemy nodes
+			if node.team > 2 then 
+				--only consider creating new tentacles for nodes with spare tentacles
+				if node.tentaclesUsed < nodeTiers[node.tier].maxTentacles then
+					--loop through each potential target node from closest to furthest away
+					for i = 1, #nodeDistances[nodeIndex] do
+						--print("looping: ", nodeIndex, i)
+						local targetNodeAndDistance = nodeDistances[nodeIndex][i]
+						--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
+						-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
+						print(targetNodeAndDistance[1])
+						print(nodes[targetNodeAndDistance[1]].team)
+
+						if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
+							(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population+15 < node.population ) then    -- adjust the +10, what population gap determines when purple helps an ally?
+
+							-- check for duplicate connection
+							local connectionAlreadyExists = false
+							for connectionIndex, connection in ipairs(connections) do
+								if connection.source == nodeIndex and connection.target == targetNodeAndDistance[1] then 
+									connectionAlreadyExists = true
+									--print("ignored duplicate: ", connection.source, " -> ", connection.target)
+								end
+
+							end
+
+
+
+							-- check for wall intersection
+							local wallIntersection = false
+							for wallIndex, wall in ipairs(walls) do 
+								ix, iy = findIntersectionPoint(nodes[nodeIndex].x, nodes[nodeIndex].y, nodes[targetNodeAndDistance[1]].x, nodes[targetNodeAndDistance[1]].y, wall.startX, wall.startY, wall.endX, wall.endY)
+								if ix ~= nil and iy ~= nil then -- intersection exists
+									wallIntersection = true
+								end
+							end
+
+
+
+							if wallIntersection == false and connectionAlreadyExists == false then
+
+								--create connection
+								print(targetNodeAndDistance[1])
+								createConnection(nodeIndex, targetNodeAndDistance[1])
+								--print("break!")
+								break
+							end
+						end
+					end
+				end
+
+				for connectionIndex, connection in ipairs(connections) do 
+					if connection.source == nodeIndex then
+
+						--when to cut a tentacle
+
+						--if same team 
+						-- numbers should work for 200 vs 20 =stay, and 200 vs 140 = stay?, 20 vs 10=cut, 10 vs 20=cut, 50 vs 20=cut?
+						if node.team == nodes[connection.target].team   and   0.8*node.population + 30 < nodes[connection.target].population + 15*nodes[connection.target].tentaclesUsed then
+
+							--if nodes[connection.target].population+30 > node.population
+
+							ix, iy = connection.sourceEdge.x, connection.sourceEdge.y
+
+							cutConnection(connectionIndex, connection, ix, iy)
+
+						end
+					end
+				end
+
+			end
+		end
+	end
+
+
+end
+
+function calculateNodeDistances()
+
+	--works out the distances between all nodes and saves them to avoid being recalculated in future  sorted in order of closest to smallest { nodeIndex, dist}
+	for nodeIndex1, node1 in ipairs(nodes) do
+		local eachNodesDistances = {}
+		for nodeIndex2, node2 in ipairs(nodes) do
+			if nodeIndex1 ~= nodeIndex2 then
+				--check for walls and ignore distance if blocked
+				for wallIndex, wall in ipairs(walls) do
+					ix, iy = findIntersectionPoint(wall.startX, wall.startY, wall.endX, wall.endY, node1.x, node1.y, node2.x, node2.y)
+					if ix == nil and iy == nil then
+						table.insert(eachNodesDistances, {nodeIndex2, distancebetween(node1.x, node1.y, node2.x, node2.y)})
+					else
+						--print("wall", nodeIndex1, " ", nodeIndex2)
+					end
+				end
+			end
+		end
+		--sort
+		for distanceIndex1, distance1 in ipairs(eachNodesDistances) do
+			for distanceIndex2, distance2 in ipairs(eachNodesDistances) do
+				if distanceIndex1 ~= distanceIndex2 and distance1[2] > distance2[2] then
+					eachNodesDistances[distanceIndex1], eachNodesDistances[distanceIndex2] = eachNodesDistances[distanceIndex2], eachNodesDistances[distanceIndex1]
+				end
+			end
+		end
+		table.insert(nodeDistances, eachNodesDistances)
+	end
 
 end
 
