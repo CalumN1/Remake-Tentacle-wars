@@ -21,6 +21,8 @@ function love.load()
 
 	timer = 0
 
+	godModeON = false
+
 	mousePosDelay = {x=0,y=0} --index = how many seconds ago it was there
 	mouseDelayTimer = 0
 	mouseEffectPoints = {{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0}}
@@ -29,7 +31,7 @@ function love.load()
 
     font14 = love.graphics.newFont(14)
     nodefont = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
-    font28 = love.graphics.newFont(28)
+    font21 = love.graphics.newFont(21)
 
 
 
@@ -63,43 +65,51 @@ function love.load()
         {
             x = arenaWidth / 3,
             y = 150,
-            team = 2,  -- team starts from 0 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-            population = 140,
+            team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+            population = 180,
             tier = 1,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
             -- regen Delay comes from the tiers table now
         },
         {
             x = arenaWidth / 1.5, 
             y = 150,
             team = 1,
-            population = 20,
+            population = 0,
             tier = 2,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
         },
         {
             x = 200,
             y = nodeMapHeight/ 3,
             team = 1,
-            population = 40,
+            population = 0,
             tier = 3,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
         },
         {
             x = 400,
             y = nodeMapHeight - 200,
             team = 1,
-            population = 80,
+            population = 0,
             tier = 4,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
         },
         {
             x = arenaWidth / 1.5,
@@ -109,7 +119,9 @@ function love.load()
             tier = 5,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
         },
         {
             x = arenaWidth - 200,
@@ -119,7 +131,9 @@ function love.load()
             tier = 6,
             regenTimer = 5,
             tentaclesUsed = 0,
-            effectTimer = 0 
+            effectTimer = 0, 
+            neutralPower = 20,
+            neutralTeam = 1
         },
     }
 
@@ -185,27 +199,42 @@ function love.load()
     	{0.7, 0.2, 0.2}
     }
 
+    darkerTeamColours = {
+    	{0.6, 0.6, 0.6},
+    	{0.0, 0.6, 0.0},
+    	{0.6, 0.1, 0.1}
+    }
+
+    --used in node display
+    nodeDisplayTeamColours = {
+    	{1, 1, 0.6},
+    	{0.3, 1, 0.3},
+    	{1, 0.3, 0.3}
+    }
+
 
     nodeTiers = { --Tiers change when the population exceeds the min or max
     	--node.tier is the index of the relevant ranges
     	-- In the game, lower tiers generate faster
-    	{min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
-    	{min = 6, max = 39, radius = 36, regenDelay =  2.4, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
-    	{min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
-    	{min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
-    	{min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
-    	{min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
+    	{name = "SPORE", min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+    	{name = "EMBRYO", min = 6, max = 39, radius = 36, regenDelay =  2.4, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
+    	{name = "PULSAR-A", min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
+    	{name = "PULSAR-B", min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
+    	{name = "ANT", min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
+    	{name = "PREDATOR", min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
     }	-- regen halfs per tentacle roughly
 
     buttons = {
-    	{name = "Levels", x=10,y=30, width=50, height=30},
-    	{name = "1", x=50,y=100, width=30, height=30},
-    	{name = "2", x=100,y=100, width=30, height=30},
-    	{name = "3", x=150,y=100, width=30, height=30},
+    	{name = "God", x=arenaWidth*0.9,y=30, width=50, height=30},
+    	{name = "Levels", x=10, y=30, width=50, height=30},
+    	{name = 1, x=50,y=100, width=30, height=30},
+    	{name = 2, x=100,y=100, width=30, height=30},
+    	{name = 3, x=150,y=100, width=30, height=30},
+    	
     	
     }
 
-    buttonsOnScreen = { {name = "Levels", x=10,y=30, width=50, height=30} }
+    buttonsOnScreen = { {name = "God", x=arenaWidth*0.9,y=30, width=50, height=30}, {name = "Levels", x=10,y=30, width=50, height=30} }
 
 
     -- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
@@ -468,8 +497,14 @@ function love.update(dt)
 					end
 					node.population = node.population +1
 				end
-			end
+			else
+				--neutral occupation
+				--[[if node.population >= math.floor(node.neutralPower/3) then
+					node.team = node.neutralTeam
+				end]]
 
+
+			end
 			-- tier change
 			if node.population > nodeTiers[node.tier].max then  -- add a white growing fading circle effect from edge when tiering up or down, or sending a tentacle, team changing, recalling as cant reach
 				node.tier = node.tier + 1
@@ -665,30 +700,52 @@ function updateMovingConnections()
 							if nodes[connection.target].team == connection.team then
 								nodes[connection.target].population = nodes[connection.target].population + 1
 							else
-								nodes[connection.target].population = nodes[connection.target].population - 1
-								if nodes[connection.target].population < 0 then
-									nodes[connection.target].team = connection.team 
-									nodes[connection.target].effectTimer = 0.5
-									nodes[connection.target].tentaclesUsed = 0 
-									nodes[connection.target].population = math.abs(nodes[connection.target].population)
-									for connectionIndex2, connection2 in ipairs(connections) do
-										if connection2.source == connection.target then
-											connection2.destination = 0
-											connection2.moving = true
-											if connection2.opposedConnectionIndex > 0 then
-												connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
-												connections[connection2.opposedConnectionIndex].moving = true
-												connections[connection2.opposedConnectionIndex].destination = 2
-												connection2.opposedConnectionIndex = 0
-											end
-											
-										end
+								if nodes[connection.target].team == 1 then
+									if nodes[connection.target].neutralTeam ~= connection.team then
+										nodes[connection.target].population = nodes[connection.target].population - 1
+									else
+										nodes[connection.target].population = nodes[connection.target].population + 1
 									end
+								else
+									nodes[connection.target].population = nodes[connection.target].population - 1
+								end
+
+								if nodes[connection.target].population < 0 then
+									if nodes[connection.target].team > 1 then
+										nodes[connection.target].team = connection.team 
+										nodes[connection.target].effectTimer = 0.5
+										nodes[connection.target].tentaclesUsed = 0 
+										nodes[connection.target].population = math.abs(nodes[connection.target].population)
+										for connectionIndex2, connection2 in ipairs(connections) do
+											if connection2.source == connection.target then
+												connection2.destination = 0
+												connection2.moving = true
+												if connection2.opposedConnectionIndex > 0 then
+													connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+													connections[connection2.opposedConnectionIndex].moving = true
+													connections[connection2.opposedConnectionIndex].destination = 2
+													connection2.opposedConnectionIndex = 0
+												end
+												
+											end
+										end
+									else
+										--switch neutralTeam but keep main team as neutral
+										nodes[connection.target].neutralTeam = connection.team
+										nodes[connection.target].population = math.abs(nodes[connection.target].population)
+									end
+								end
+
+								--convert team from neutral 
+								if nodes[connection.target].team == 1 and nodes[connection.target].population >= math.floor(nodes[connection.target].neutralPower/3) then
+									print("neutral converted",  nodes[connection.target].neutralPower)
+									nodes[connection.target].team = connection.team
+									nodes[connection.target].population = nodes[connection.target].neutralPower
 								end
 							end
 						end
 					end
-					if #connection.links == 0 then  -- couldn't used tentacle end point
+					if #connection.links == 0 then  -- couldn't use tentacle end point
 						connection.moving = false
 
 						--nodes[connection.source].population = nodes[connection.source].population - 1
@@ -739,7 +796,15 @@ function glowDelivery()
 				--print(glower)
 				if glower < 1 then
 					if nodes[connection.target].team ~= connection.team then
-						nodes[connection.target].population = nodes[connection.target].population - 1
+						if nodes[connection.target].team == 1 then
+							if nodes[connection.target].neutralTeam ~= connection.team then
+								nodes[connection.target].population = nodes[connection.target].population - 1
+							else
+								nodes[connection.target].population = nodes[connection.target].population + 1
+							end
+						else
+							nodes[connection.target].population = nodes[connection.target].population - 1
+						end
 					else
 						if nodes[connection.target].population < 200 then
 							nodes[connection.target].population = nodes[connection.target].population + 1
@@ -749,23 +814,36 @@ function glowDelivery()
 
 					-- convert team through glow delivery
 					if nodes[connection.target].population < 0 then
-						nodes[connection.target].team = connection.team
-						nodes[connection.target].effectTimer = 0.5
-						nodes[connection.target].tentaclesUsed = 0 
-						nodes[connection.target].population = math.abs(nodes[connection.target].population)
-						-- if dead node has other tentacles out, retract them
-						for connectionIndex2, connection2 in ipairs(connections) do
-							if connection2.source == connection.target then
-								connection2.destination = 0
-								connection2.moving = true
-								if connection2.opposedConnectionIndex > 0 then
-									connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
-									connections[connection2.opposedConnectionIndex].moving = true
-									connections[connection2.opposedConnectionIndex].destination = 2
+						if nodes[connection.target].team > 1 then
+							nodes[connection.target].team = connection.team
+							nodes[connection.target].effectTimer = 0.5
+							nodes[connection.target].tentaclesUsed = 0 
+							nodes[connection.target].population = math.abs(nodes[connection.target].population)
+							-- if dead node has other tentacles out, retract them
+							for connectionIndex2, connection2 in ipairs(connections) do
+								if connection2.source == connection.target then
+									connection2.destination = 0
+									connection2.moving = true
+									if connection2.opposedConnectionIndex > 0 then
+										connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
+										connections[connection2.opposedConnectionIndex].moving = true
+										connections[connection2.opposedConnectionIndex].destination = 2
+									end
+									connection2.opposedConnectionIndex = 0
 								end
-								connection2.opposedConnectionIndex = 0
 							end
+						else
+							--switch neutralTeam but keep main team as neutral
+							nodes[connection.target].neutralTeam = connection.team
+							nodes[connection.target].population = math.abs(nodes[connection.target].population)
 						end
+					end
+
+					--convert team from neutral 
+					if nodes[connection.target].team == 1 and nodes[connection.target].population >= math.floor(nodes[connection.target].neutralPower/3) then
+						print("neutral converted",  nodes[connection.target].neutralPower)
+						nodes[connection.target].team = connection.team
+						nodes[connection.target].population = nodes[connection.target].neutralPower
 					end
 
 				end
@@ -836,9 +914,9 @@ function adjustConnectionIndexes(deletedConnectionIndex)
 
 	local totalConnections = #connections
 
-	print(totalConnections,"ConnectionIndex round up: ")
+	--print(totalConnections,"ConnectionIndex round up: ")
 	for connectionIndex, connection in ipairs(connections) do
-		print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
+		--print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
 	end
 
 	for i = 1, totalConnections do
@@ -848,9 +926,9 @@ function adjustConnectionIndexes(deletedConnectionIndex)
 	end
 
 
-	print(totalConnections,"POST - ConnectionIndex round up: ")
+	--print(totalConnections,"POST - ConnectionIndex round up: ")
 	for connectionIndex, connection in ipairs(connections) do
-		print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
+		--print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
 	end
 
 
@@ -947,6 +1025,7 @@ function love.mousereleased(mouseX, mouseY)
 	and nodeSelected ~= releasenode   -- means not equal
 	and nodes[nodeSelected].population > 0
 	and nodes[nodeSelected].tentaclesUsed < nodeTiers[nodes[nodeSelected].tier].maxTentacles
+	and (nodes[nodeSelected].team == 2 or godModeON)
 	then
 		-- check for wall intersection
 		local wallIntersection = false
@@ -980,7 +1059,7 @@ function love.mousereleased(mouseX, mouseY)
 		-- check every connection for an intersection, allows multiple cut lines
 		for connectionIndex, connection in ipairs(connections) do 
 			ix, iy = findIntersectionPoint(connection.sourceEdge.x,connection.sourceEdge.y, connection.targetEdge.x,connection.targetEdge.y, pointSelected.x, pointSelected.y, releaseMouseX, releaseMouseY)
-			if ix ~= nil and iy ~= nil then -- intersection exists
+			if ix ~= nil and iy ~= nil and (connection.team == 2 or godModeON) then -- intersection exists
 								
 				cutConnection(connectionIndex, connection, ix, iy)
 
@@ -997,7 +1076,7 @@ function cutConnection(connectionIndex, connection, ix, iy)
 		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 		if connection.opposedConnectionIndex > 0 then
 			connection.opposedConnectionIndex = 0
-			print(connectionIndex, connection.opposedConnectionIndex)
+			--print(connectionIndex, connection.opposedConnectionIndex)
 		end
 		nodes[connection.source].population = nodes[connection.source].population +1
 	elseif connection.destination == 2 then
@@ -1006,7 +1085,7 @@ function cutConnection(connectionIndex, connection, ix, iy)
 		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 		splitTentacle(connectionIndex, ix, iy) --updates connection.splitLink
 		nodes[connection.target].population = nodes[connection.target].population + 1
-		print(connection.splitLink," links: ", #connection.links)
+		--print(connection.splitLink," links: ", #connection.links)
 		if connection.splitLink < 1 then
 			connection.splitLink = 1
 		end
@@ -1054,31 +1133,37 @@ function love.mousepressed(mouseX, mouseY)
 	local buttonSelected = isMouseInButton()
 
 	--menu interactions
-	if buttonSelected > 1 then
-		connections = {}
-		nodeDistances = {}
-		levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
-		nodes = levelNodesTable[buttonSelected-1] 
-		walls = levelWallsTable[buttonSelected-1] --walls dont change so no need to revert anything each time
+	if buttonSelected > 0 then
+		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then
+			connections = {}
+			nodeDistances = {}
+			levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
+			nodes = levelNodesTable[buttonsOnScreen[buttonSelected].name] 
+			walls = levelWallsTable[buttonSelected-1] --walls dont change so no need to revert anything each time
 
-		calculateNodeDistances()
-	elseif buttonSelected == 1 then
-		print(#buttonsOnScreen)
-		if #buttonsOnScreen < 3 then
-			for b = 2, #buttons do
-				table.insert(buttonsOnScreen, buttons[b])
+			calculateNodeDistances()
+		elseif buttonsOnScreen[buttonSelected].name == "Levels" then
+			print("buttons on screen: ", #buttonsOnScreen)
+			if #buttonsOnScreen < #buttons then
+				for b = 2, #buttons do
+					table.insert(buttonsOnScreen, buttons[b])
+				end
+			else
+				for b = #buttonsOnScreen, 1, -1 do
+					if type(buttonsOnScreen[b].name) ~= "string" then
+						table.remove(buttonsOnScreen, b) 
+						print("Removed: ", b, #buttonsOnScreen)
+					end
+				end
 			end
+		elseif buttonsOnScreen[buttonSelected].name == "God" then
+			godModeON = not godModeON
+
 		else
-			for b = #buttonsOnScreen, 2, -1 do
-				table.remove(buttonsOnScreen, b) 
-				print("Removed: ", b, #buttonsOnScreen)
-			end
+
+
 		end
-	else
-
-
 	end
-
 
 end
 
@@ -1145,8 +1230,8 @@ function enemyAI()
 						local targetNodeAndDistance = nodeDistances[nodeIndex][i]
 						--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
 						-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
-						print(targetNodeAndDistance[1])
-						print(nodes[targetNodeAndDistance[1]].team)
+						--print(targetNodeAndDistance[1])
+						--print(nodes[targetNodeAndDistance[1]].team)
 
 						if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
 							(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population+15 < node.population ) then    -- adjust the +10, what population gap determines when purple helps an ally?
@@ -1263,9 +1348,16 @@ function love.draw(mouseX, mouseY)
 
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
 		love.graphics.setColor(0.5,0,0.5)
+		if button.name == "God" then
+			if godModeON then
+				love.graphics.setColor(0,1,0)
+			end
+		end
 		love.graphics.rectangle('fill',button.x,button.y,button.width, button.height)
+
 		love.graphics.setColor(1,1,1)
 		love.graphics.print(button.name,button.x,button.y)
+		
 	end
 
 
@@ -1462,8 +1554,17 @@ function love.draw(mouseX, mouseY)
 	for nodeIndex, node in ipairs(nodes) do
 		-- draw node depending on team colour
 		love.graphics.setColor(teamColours[node.team])
+		--darken the colour when weak
+		if node.population < 5 and node.team ~= 1 then
+			local weakColour = {}
+			for i = 1, 3 do
+				weakColour[i] = teamColours[node.team][i]*(0.5+node.population/10)
+			end
+			love.graphics.setColor(weakColour)
+		end
 		-- draw node
 		love.graphics.circle('fill', node.x, node.y, nodeCentreRadius)
+		love.graphics.setColor(teamColours[node.team])
 		-- node border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
@@ -1727,7 +1828,7 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setColor(0.8, 0.8, 0)
 	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
-		if nodeSelected > 0 and pointSelected == 0 then
+		if nodeSelected > 0 and pointSelected == 0 and (nodes[nodeSelected].team == 2 or godModeON) then
 			love.graphics.setColor(0.8, 0.8, 0)
 			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
 
@@ -1753,13 +1854,85 @@ function love.draw(mouseX, mouseY)
 
 			--love.graphics.line(500,0,500,500)
 
-		else
+		elseif nodeSelected == 0 then
 			love.graphics.setColor(0.8, 0, 0)
 			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
 			--get angle of red line
 			--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
 
 		end
+	end
+
+	--hover node display
+	local mouseNode = isMouseInNode()
+	if mouseNode > 0 then
+		local Xshift = 0
+		local Yshift = 40 + (2*nodeTiers[mouseNode].radius)
+
+		--shift display depending on where the node is
+		--shift if near edge
+		if nodes[mouseNode].x < 100 then
+			Xshift = Xshift+100
+		elseif nodes[mouseNode].x > arenaWidth- 100 then
+			Xshift = Xshift-100
+		end
+		--shift above or below
+		if nodes[mouseNode].y > 100+arenaHeight/2 then
+			Yshift = -Yshift-60
+		end
+
+		--hover node display
+		love.graphics.setColor(0.1, 0.1, 0.1)
+		love.graphics.rectangle('fill', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
+
+		--border
+		love.graphics.setColor(0.7, 0.7, 0.7)
+		love.graphics.setLineWidth( 1 )
+		love.graphics.rectangle('line', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
+
+
+
+		love.graphics.setFont(font21)
+		love.graphics.setColor(0.7, 0.7, 0.7)
+		--love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
+		love.graphics.print("CLASS: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
+		love.graphics.setColor(nodeDisplayTeamColours[nodes[mouseNode].team])
+		love.graphics.print(nodeTiers[nodes[mouseNode].tier].name, 90+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
+
+		-- if neutral display progress, otherwise show used tentacles
+		if nodes[mouseNode].team > 1 then
+
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+			love.graphics.setColor(1,1,0.1)
+			love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
+
+			love.graphics.print("TENTACLES: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+			love.graphics.setColor(1,1,0.1)
+			love.graphics.print(nodes[mouseNode].tentaclesUsed, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			love.graphics.print("/"..nodeTiers[nodes[mouseNode].tier].maxTentacles, 153+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+		else
+
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+			love.graphics.setColor(1,1,0.1)
+			love.graphics.print(nodes[mouseNode].neutralPower, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
+
+			love.graphics.print("OCCUPIED: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+			love.graphics.setColor(1,1,0.1)
+			love.graphics.print(nodes[mouseNode].population, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			love.graphics.print("/"..math.floor(nodes[mouseNode].neutralPower/3), 165+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+
+		end
+
+
+
 	end
 
 end
