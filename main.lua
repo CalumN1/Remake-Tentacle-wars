@@ -14,11 +14,17 @@ function love.load()
     levelNodesTable = levelNodes(arenaWidth,arenaHeight)
     levelWallsTable = levelWalls(arenaWidth,arenaHeight)
 
-    my_background = love.graphics.newImage('TwarsBackgroundClean.png')
+    game_background = love.graphics.newImage('TwarsBackgroundClean.png')
+    menu_background = love.graphics.newImage('TwarsMenuBackgroundClean.png')
+
+    current_background = game_background
+
+    currentLevel = -1 -- 0 means menu
 
 	timer = 0
 
 	godModeON = false
+	AION = true
 
 	mousePosDelay = {x=0,y=0} --index = how many seconds ago it was there
 	mouseDelayTimer = 0
@@ -27,9 +33,10 @@ function love.load()
     love.graphics.setBackgroundColor( 0., 0.1, 0.)
 
     font14 = love.graphics.newFont(14)
-    nodefont = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
+    nodefont27 = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
+    nodefont38 = love.graphics.newFont('Fonts/editundo.ttf', 38, 'none',1)
     font21 = love.graphics.newFont(21)
-
+    font30 = love.graphics.newFont(30)
 
 
     nodeCentreRadius = 26
@@ -191,22 +198,22 @@ function love.load()
     }
 
     teamColours = {
-    	{0.7, 0.7, 0.7},
-    	{0.1, 0.7, 0.1},
-    	{0.7, 0.2, 0.2}
+    	{0.7, 0.7, 0.7, 1},
+    	{0.1, 0.7, 0.1, 1},
+    	{0.7, 0.2, 0.2, 1}
     }
 
     darkerTeamColours = {
-    	{0.6, 0.6, 0.6},
-    	{0.0, 0.6, 0.0},
-    	{0.6, 0.1, 0.1}
+    	{0.6, 0.6, 0.6, 1},
+    	{0.0, 0.6, 0.0, 1},
+    	{0.6, 0.1, 0.1, 1}
     }
 
     --used in node display
     nodeDisplayTeamColours = {
-    	{1, 1, 0.6},
-    	{0.3, 1, 0.3},
-    	{1, 0.3, 0.3}
+    	{1, 1, 0.6, 1},
+    	{0.3, 1, 0.3, 1},
+    	{1, 0.3, 0.3, 1}
     }
 
 
@@ -222,17 +229,32 @@ function love.load()
     }	-- regen halfs per tentacle roughly
 
     buttons = {
-    	{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30},
-    	{name = "Levels", x=10, y=30, width=50, height=30},
-    	{name = 1, x=50,y=100, width=30, height=30},
-    	{name = 2, x=100,y=100, width=30, height=30},
-    	{name = 3, x=150,y=100, width=30, height=30},
-    	
-    	
+    	{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+    	{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+    	{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+    	{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" },   -- circle
+    	{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30, shape = "rectangle"},
+    	{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
+    	{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
+    	{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
+    	{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
     }
+    -- all level buttons
+    for i = 1, 19 do
+		table.insert(buttons, {name = i+1, x= arenaWidth/2+270*(math.sin(2*math.pi*i/20)),  y= arenaHeight/2-270*(math.cos(2*math.pi*i/20)), width=35, height=35, shape = "circle"})
+	end
 
-    buttonsOnScreen = { {name = "God", x=arenaWidth*0.9,y=80, width=50, height=30}, {name = "Levels", x=10,y=30, width=50, height=30} }
+    buttonsOnScreen = { 
+    	{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+    	{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+    	{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+    	{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+	    {name = "God", x=arenaWidth*0.7,y=30, width=50, height=30, shape = "rectangle"}, 
+	    {name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
+	    {name = "Complete", x=10,y=30, width=80, height=30, shape = "rectangle"} 
+	}
 
+	levelProgress = {1,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3} -- 1 = unlocked, 2 = completed, 3 = locked --to match team colours
 
     -- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
 
@@ -251,7 +273,7 @@ function love.load()
         
     	for buttonIndex, button in ipairs(buttonsOnScreen) do
 	    	if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height then
-				print("Button ", buttonIndex, " activated!")
+				print(button.name, " button pressed")
 				return buttonIndex
 			end
 
@@ -523,32 +545,25 @@ function love.update(dt)
 
 
 
-
-
-		-- remove duplicate connections -- replaced so they cant be created in the first place, the new check only runs on connection creation too
-		--[[for connectionIndex1, connection1 in ipairs(connections) do
-			for connectionIndex2, connection2 in ipairs(connections) do
-
-				if connection1.source == connection2.source and connection1.target == connection2.target and connectionIndex1 ~= connectionIndex2 then 
-					table.remove(connections, connectionIndex2)
-					print("removed duplicate: ", connection2.source, " -> ", connection2.target)
-				end
-			end
-		end]]
 		
 		-- move this to run only when a cut, node-loss, or new connection is made
 		checkOpposedConnections()
 
 		
-		
 		updateMovingConnections() --main update processes
 
-		enemyAI()
+		if AION then
+			enemyAI()
+		end
 
 		glowDelivery()
 
 
 		accumulator = accumulator - 1/FPSlogicTarget
+
+		if accumulator > 1 then		--limit catchup
+			accumulator = 1
+		end
   	end
 end
 
@@ -780,9 +795,6 @@ function glowDelivery()
 	--Glow delivery
 	--print(#connection.glowing)
 
-
-
-
 	if deliveryTimer < 0 then
 
 		for connectionIndex, connection in ipairs(connections) do
@@ -1012,6 +1024,8 @@ function createConnection(sourceNode, targetNode)
 
 end
 
+
+
 function love.mousereleased(mouseX, mouseY)
 
 	local releasenode = isMouseInNode()
@@ -1110,8 +1124,6 @@ function cutConnection(connectionIndex, connection, ix, iy)
 
 	connection.moving = true --this triggers everything to start processing this tentacle again till resolved
 
-
-
 end
 
 
@@ -1131,31 +1143,64 @@ function love.mousepressed(mouseX, mouseY)
 
 	--menu interactions
 	if buttonSelected > 0 then
-		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then
+		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
 			connections = {}
 			nodeDistances = {}
 			levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
-			nodes = levelNodesTable[buttonsOnScreen[buttonSelected].name] 
-			walls = levelWallsTable[buttonsOnScreen[buttonSelected].name] --walls dont change so no need to revert anything each time
+			currentLevel = buttonsOnScreen[buttonSelected].name
+			current_background = game_background
+			nodes = levelNodesTable[currentLevel] 
+			walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
 
 			calculateNodeDistances()
-		elseif buttonsOnScreen[buttonSelected].name == "Levels" then
-			print("buttons on screen: ", #buttonsOnScreen)
-			if #buttonsOnScreen < #buttons then
-				for b = 2, #buttons do
-					table.insert(buttonsOnScreen, buttons[b])
-				end
-			else
-				for b = #buttonsOnScreen, 1, -1 do
-					if type(buttonsOnScreen[b].name) ~= "string" then
-						table.remove(buttonsOnScreen, b) 
-						print("Removed: ", b, #buttonsOnScreen)
-					end
+
+			for b = #buttonsOnScreen, 1, -1 do
+				if type(buttonsOnScreen[b].name) ~= "string" then
+					print("Removed: ", buttonsOnScreen[b].name, #buttonsOnScreen)
+					table.remove(buttonsOnScreen, b) 
 				end
 			end
+
+		elseif buttonsOnScreen[buttonSelected].name == "Menu" then
+			currentLevel = 0
+			current_background = menu_background
+			connections = {}
+			nodes = {}
+			walls = {}
+			print("buttons on screen: ", #buttonsOnScreen)
+			if #buttonsOnScreen < #buttons then
+				buttonsOnScreen = {}
+				for b = 1, #buttons do
+					table.insert(buttonsOnScreen, buttons[b])
+				end
+			end
+			print("buttons on screen: ", #buttonsOnScreen)
+
 		elseif buttonsOnScreen[buttonSelected].name == "God" then
 			godModeON = not godModeON
+		elseif buttonsOnScreen[buttonSelected].name == "AI" then
+			AION = not AION
+		elseif buttonsOnScreen[buttonSelected].name == "Complete" then
+			levelProgress[currentLevel] = 2
+			levelProgress[currentLevel+1] = 1
+			buttons[#buttons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
+			buttons[#buttons-20+currentLevel+1].y = arenaHeight/2-330*(math.cos(2*math.pi*(currentLevel)/20))
+		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
+			connections = {}
+			nodeDistances = {}
+			levelNodesTable = levelNodes(arenaWidth,arenaHeight)
+			nodes = levelNodesTable[currentLevel] 
 
+			calculateNodeDistances() 
+
+		elseif buttonsOnScreen[buttonSelected].name == "Unlock" then
+			for level, progressNumber in ipairs(levelProgress) do
+				if progressNumber == 3 then
+					levelProgress[level] = 1
+					buttons[#buttons-20+level].x = arenaWidth/2+330*(math.sin(2*math.pi*(level-1)/20))
+					buttons[#buttons-20+level].y = arenaHeight/2-330*(math.cos(2*math.pi*(level-1)/20))
+				end
+			end
 		else
 
 
@@ -1339,21 +1384,70 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.setBackgroundColor(1,1,1)
 	love.graphics.setColor(1,1,1,1)
-	love.graphics.draw(my_background)
+	love.graphics.draw(current_background)
+
+	
+
+	--grey control bar at the bottom
+	if currentLevel > 0 then
+		love.graphics.setColor(0,0,0,0.6)
+		love.graphics.rectangle('fill', 0, arenaHeight-60, arenaWidth, arenaHeight)
+
+		love.graphics.setFont(font30)
+		love.graphics.setColor(1,1,1)
+		love.graphics.printf("Tentacle Wars - Remake", arenaWidth/2-200, arenaHeight-50, 400 , 'center')
+	end
 
 	love.graphics.setFont(font14)
 
+	--menu
+	if currentLevel == 0 then
+		love.graphics.setColor(1,1,1)
+		love.graphics.circle('line',arenaWidth/2,arenaHeight/2,180)
+		for i = 0, 19 do
+			love.graphics.line(arenaWidth/2+180*(math.sin(2*math.pi*i/20)),   arenaHeight/2-180*(math.cos(2*math.pi*i/20)), 
+				arenaWidth/2+ ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.sin(2*math.pi*i/20)),    arenaHeight/2- ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.cos(2*math.pi*i/20)) )
+		end
+	end
+
+	--draw buttons
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
 		love.graphics.setColor(0.5,0,0.5)
 		if button.name == "God" then
 			if godModeON then
-				love.graphics.setColor(0,1,0)
+				love.graphics.setColor(0,0.5,0)
 			end
 		end
-		love.graphics.rectangle('fill',button.x,button.y,button.width, button.height)
+		if button.name == "AI" then
+			if AION then
+				love.graphics.setColor(0,0.5,0)
+			end
+		end
 
-		love.graphics.setColor(1,1,1)
-		love.graphics.print(button.name,button.x,button.y)
+		love.graphics.setLineWidth(3)
+
+		if button.shape == "rectangle" then
+			love.graphics.rectangle('fill',button.x,button.y,button.width, button.height)
+			love.graphics.setColor(1,1,1)
+			love.graphics.print(button.name,button.x,button.y)
+		elseif button.shape == "circle" then
+
+			if type(button.name) ~= "string" then
+				teamColours[levelProgress[button.name]][4] = 0.5
+
+				love.graphics.setColor(teamColours[levelProgress[button.name]])
+				love.graphics.circle('fill',button.x,button.y,button.height)
+				love.graphics.setColor(1,1,1,1)
+				love.graphics.setFont(nodefont38)
+				love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
+				love.graphics.setFont(font14)
+				teamColours[levelProgress[button.name]][4] = 1
+			end
+			--border
+			love.graphics.setColor(1,1,1)
+			love.graphics.circle('line',button.x,button.y,button.height)
+
+		end
 	end
 
 
@@ -1379,11 +1473,15 @@ function love.draw(mouseX, mouseY)
 	for team, teamPower in ipairs(totalTeamPowers) do
 		love.graphics.setColor(teamColours[team])
 		love.graphics.rectangle('fill', arenaWidth-230+powerProgress, 30, 200*teamPower/totalPower,20)
+
+		--border (per team to get the line between colours)
+		love.graphics.setColor(1,1,1,1)
+		love.graphics.setLineWidth(2)
+		love.graphics.rectangle('line', arenaWidth-230+powerProgress, 30, 200*teamPower/totalPower,20)
+
 		powerProgress = powerProgress+(200*teamPower/totalPower)
 	end
-	love.graphics.setColor(1,1,1,1)
-	love.graphics.setLineWidth(2)
-	love.graphics.rectangle('line', arenaWidth-230, 30, 200,20)
+
 
 
 
@@ -1737,7 +1835,7 @@ function love.draw(mouseX, mouseY)
 		-- draw population number or occupation progress 
 		if node.team > 1 then
 			-- draw population number
-			love.graphics.setFont(nodefont)  -- To-Do: make font bold
+			love.graphics.setFont(nodefont27)  -- To-Do: make font bold
 			love.graphics.setColor(1, 1, 1)
 			love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
 		else

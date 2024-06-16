@@ -14,9 +14,17 @@ To Do List
 
 -	fix walls: fill shape different from border shape ????
 
--	slow down enemy AI !
+-	other AI Improvements?
 
--	AI Improvements
+	-	slow down enemy AI ? a bit more maybe?
+
+	-	make AI oppose when attacked
+
+	-	let AI cut points vary, depending on populations?
+
+	-	fix new connection issue - indecision create and cancel loop still exists 
+
+	-	make AI judge differences after moving the distance or ignore while moving? never cancel while on route?
 
 -	add upto level 5
 
@@ -26,11 +34,25 @@ To Do List
 
 -	add upto level 20
 
+- 	add control bar at the bottom
 
-Later goals
+- 	add timer
+
+-	add power limits?
+
+- 	add "zone"/level number to top
+
+-	pause when window in background?
+
+-	fix initial glow delivery burst
+
 
 -	create a menu
 
--	create an editor that can permenantly save to the levels file
+-	menu transition fade
+
+-	create an editor 
+
+-	let the editor permenantly save to the levels file/a new file
 
 -	the editor should use a GUI
