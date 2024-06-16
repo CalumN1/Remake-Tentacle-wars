@@ -16,9 +16,6 @@ function love.load()
 
     my_background = love.graphics.newImage('TwarsBackgroundClean.png')
 
-    nodeMapWidth = 1200
-	nodeMapHeight = 900
-
 	timer = 0
 
 	godModeON = false
@@ -63,7 +60,7 @@ function love.load()
 
     nodes = {
         {
-            x = arenaWidth / 3,
+            x = 50,
             y = 150,
             team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
             population = 180,
@@ -76,7 +73,7 @@ function love.load()
             -- regen Delay comes from the tiers table now
         },
         {
-            x = arenaWidth / 1.5, 
+            x = arenaWidth -50, 
             y = 150,
             team = 1,
             population = 0,
@@ -88,8 +85,8 @@ function love.load()
             neutralTeam = 1
         },
         {
-            x = 200,
-            y = nodeMapHeight/ 3,
+            x = 50,
+            y = arenaHeight - 200,
             team = 1,
             population = 0,
             tier = 3,
@@ -100,8 +97,8 @@ function love.load()
             neutralTeam = 1
         },
         {
-            x = 400,
-            y = nodeMapHeight - 200,
+            x = arenaWidth -50,
+            y = arenaHeight - 200,
             team = 1,
             population = 0,
             tier = 4,
@@ -113,9 +110,9 @@ function love.load()
         },
         {
             x = arenaWidth / 1.5,
-            y = nodeMapHeight - 200,
+            y = arenaHeight - 200,
             team = 3,
-            population = 40,
+            population = 50,
             tier = 5,
             regenTimer = 5,
             tentaclesUsed = 0,
@@ -125,9 +122,9 @@ function love.load()
         },
         {
             x = arenaWidth - 200,
-            y = nodeMapHeight - 500,
+            y = arenaHeight - 500,
             team = 3,
-            population = 10,
+            population = 20,
             tier = 6,
             regenTimer = 5,
             tentaclesUsed = 0,
@@ -225,7 +222,7 @@ function love.load()
     }	-- regen halfs per tentacle roughly
 
     buttons = {
-    	{name = "God", x=arenaWidth*0.9,y=30, width=50, height=30},
+    	{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30},
     	{name = "Levels", x=10, y=30, width=50, height=30},
     	{name = 1, x=50,y=100, width=30, height=30},
     	{name = 2, x=100,y=100, width=30, height=30},
@@ -234,7 +231,7 @@ function love.load()
     	
     }
 
-    buttonsOnScreen = { {name = "God", x=arenaWidth*0.9,y=30, width=50, height=30}, {name = "Levels", x=10,y=30, width=50, height=30} }
+    buttonsOnScreen = { {name = "God", x=arenaWidth*0.9,y=80, width=50, height=30}, {name = "Levels", x=10,y=30, width=50, height=30} }
 
 
     -- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
@@ -880,7 +877,7 @@ function checkOpposedConnections()
 			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and 
 				connection2.opposedConnectionIndex == 0 and connection1.destination > 0 and connection2.destination > 0 then 
 
-				if connection1.team == connection2.team then
+				if connection1.team == connection2.team and connection1.destination ~= 3 then
 					if connectionIndex1 < connectionIndex2 then
 						connection1.destination = 0
 						connection2.destination = 2
@@ -891,7 +888,7 @@ function checkOpposedConnections()
 						--do nothing, the above will trigger in a later loop
 
 					end
-				else
+				elseif connection1.team ~= connection2.team and connection1.destination ~= 3 then
 
 					connection1.opposedConnectionIndex= connectionIndex2
 					connection2.opposedConnectionIndex= connectionIndex1
@@ -1139,7 +1136,7 @@ function love.mousepressed(mouseX, mouseY)
 			nodeDistances = {}
 			levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
 			nodes = levelNodesTable[buttonsOnScreen[buttonSelected].name] 
-			walls = levelWallsTable[buttonSelected-1] --walls dont change so no need to revert anything each time
+			walls = levelWallsTable[buttonsOnScreen[buttonSelected].name] --walls dont change so no need to revert anything each time
 
 			calculateNodeDistances()
 		elseif buttonsOnScreen[buttonSelected].name == "Levels" then
@@ -1357,7 +1354,6 @@ function love.draw(mouseX, mouseY)
 
 		love.graphics.setColor(1,1,1)
 		love.graphics.print(button.name,button.x,button.y)
-		
 	end
 
 
@@ -1368,6 +1364,27 @@ function love.draw(mouseX, mouseY)
 	love.graphics.print("Logic updates per second: "..FPSlogicActual.."/"..FPSlogicTarget, 120, 10)
 
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 10)
+
+	--draw total power ratio bar
+	local totalTeamPowers = {0,0,0}
+	local totalPower = 0
+	for nodeIndex, node in ipairs(nodes) do
+		if node.team > 1 then
+			totalTeamPowers[node.team] = totalTeamPowers[node.team] + node.population
+			totalPower = totalPower + node.population
+		end
+	end
+
+	local powerProgress = 0
+	for team, teamPower in ipairs(totalTeamPowers) do
+		love.graphics.setColor(teamColours[team])
+		love.graphics.rectangle('fill', arenaWidth-230+powerProgress, 30, 200*teamPower/totalPower,20)
+		powerProgress = powerProgress+(200*teamPower/totalPower)
+	end
+	love.graphics.setColor(1,1,1,1)
+	love.graphics.setLineWidth(2)
+	love.graphics.rectangle('line', arenaWidth-230, 30, 200,20)
+
 
 
 	mouseEffect()
@@ -1717,11 +1734,20 @@ function love.draw(mouseX, mouseY)
 		love.graphics.origin()
 		
 
-		-- draw population number
-		love.graphics.setFont(nodefont)  -- To-Do: make font bold
-		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
-
+		-- draw population number or occupation progress 
+		if node.team > 1 then
+			-- draw population number
+			love.graphics.setFont(nodefont)  -- To-Do: make font bold
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
+		else
+			--draw occupation progress on neutral nodes
+			love.graphics.setColor(teamColours[node.neutralTeam])
+			love.graphics.circle('fill', node.x, node.y, (math.sin(timer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
+			--border
+			love.graphics.setColor(1,1,1)
+			love.graphics.circle('line', node.x, node.y, (math.sin(timer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
+		end
 
 		--used and available tentacles
 		if node.team > 1 then -- move this to include population number later, so it doesnt show on grey nodes either
@@ -1867,7 +1893,7 @@ function love.draw(mouseX, mouseY)
 	local mouseNode = isMouseInNode()
 	if mouseNode > 0 then
 		local Xshift = 0
-		local Yshift = 40 + (2*nodeTiers[mouseNode].radius)
+		local Yshift = 20 + (1.5*nodeTiers[nodes[mouseNode].tier].radius)
 
 		--shift display depending on where the node is
 		--shift if near edge

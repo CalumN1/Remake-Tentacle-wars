@@ -13,7 +13,11 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 3,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-		    	effectTimer = 0  
+		    	effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth -300, 
@@ -23,7 +27,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 1,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-		    	effectTimer = 0  
+		    	effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    }
 		},
 
@@ -37,7 +43,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 1,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth / 2 ,
@@ -47,7 +55,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 1,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth / 2+50,
@@ -57,7 +67,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 1,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth / 3.2 ,
@@ -67,7 +79,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 3,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth / 1.4 ,
@@ -77,7 +91,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 3,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		},
 
@@ -90,7 +106,9 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 3,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 30,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth/2.1, 
@@ -100,47 +118,57 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tier = 2,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 30,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth/4, 
 		        y = arenaHeight / 3,
 		        team = 1,
-		        population = 20,
+		        population = 0,
 		        tier = 2,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth/2.2, 
 		        y = arenaHeight / 5,
 		        team = 1,
-		        population = 20,
+		        population = 0,
 		        tier = 2,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth/1.4, 
 		        y = arenaHeight / 3,
 		        team = 1,
-		        population = 20,
+		        population = 0,
 		        tier = 2,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 30,
+	            neutralTeam = 1  
 		    },
 		    {
 		        x = arenaWidth/1.4, 
 		        y = arenaHeight / 1.5,
 		        team = 1,
-		        population = 20,
+		        population = 0,
 		        tier = 2,
 		        regenTimer = 5,
 		        tentaclesUsed = 0,
-			    effectTimer = 0  
+			    effectTimer = 0, 
+	            neutralPower = 30,
+	            neutralTeam = 1  
 		    }
 		},
 	}
