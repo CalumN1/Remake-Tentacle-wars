@@ -9,285 +9,324 @@ require "levels"  -- separate file, do this for each seperate file, not conf or 
 -- All those things can be done anywhere else as well, but doing them here means that they are done once only, saving a lot of system resources
 function love.load()
 	arenaWidth = 1440
-    arenaHeight = 1080 -- changing this doesnt do anything? need to at least change conf file too
+	arenaHeight = 1080 -- changing this doesnt do anything? need to at least change conf file too
 
-    levelNodesTable = levelNodes(arenaWidth,arenaHeight)
-    levelWallsTable = levelWalls(arenaWidth,arenaHeight)
+	levelNodesTable = levelNodes(arenaWidth,arenaHeight)
+	levelWallsTable = levelWalls(arenaWidth,arenaHeight)
 
-    game_background = love.graphics.newImage('TwarsBackgroundClean.png')
-    menu_background = love.graphics.newImage('TwarsMenuBackgroundClean.png')
+	game_background = love.graphics.newImage('TwarsBackgroundClean.png')
+	menu_background = love.graphics.newImage('TwarsMenuBackgroundClean.png')
 
-    current_background = game_background
+	current_background = game_background
 
-    currentLevel = -1 -- 0 means menu
+	cursor = love.mouse.getSystemCursor("hand")
+
+	currentLevel = 100 -- 0 means menu
 
 	timer = 0
 
 	godModeON = false
 	AION = true
+	editor = false
+	createMicrobe = true
+	dragging = false
 
 	mousePosDelay = {x=0,y=0} --index = how many seconds ago it was there
 	mouseDelayTimer = 0
 	mouseEffectPoints = {{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0},{x=0,y=0}}
 
-    love.graphics.setBackgroundColor( 0., 0.1, 0.)
+	love.graphics.setBackgroundColor( 0., 0.1, 0.)
 
-    font14 = love.graphics.newFont(14)
-    nodefont27 = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
-    nodefont38 = love.graphics.newFont('Fonts/editundo.ttf', 38, 'none',1)
-    font21 = love.graphics.newFont(21)
-    font30 = love.graphics.newFont(30)
+	font14 = love.graphics.newFont(14)
+	nodefont27 = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
+	nodefont38 = love.graphics.newFont('Fonts/editundo.ttf', 38, 'none',1)
+	titlefont = love.graphics.newFont('Fonts/Pulp Fiction M54.ttf', 120, 'none',1)
+	font21 = love.graphics.newFont(21)
+	font30 = love.graphics.newFont(30)
 
 
-    nodeCentreRadius = 26
+	nodeCentreRadius = 26
 	--nodeRadius = 36  -- outer ring, will vary, changing for nodeTiers[node.tier].radius
 
 	linkRadius = 7
 	linkSpacing = 10
 
-    nodeSelected = 0
-    pointSelected = 0
+	nodeSelected = 0
+	pointSelected = {x = 0, y = 0}
 
-    deliverySpeed = 0.1 --seconds before moving forward
-    deliveryTimer = 0
+	deliverySpeed = 0.1 --seconds before moving forward
+	deliveryTimer = 0
 
-    cutSource = {
-    	--x = 5
-    	-- y = 10
-    }
+	cutSource = {
+		--x = 5
+		-- y = 10
+	}
 
-    FPSlogicTarget = 160 --forced FPS otherwise speeds change, maybe adjust speeds relative to FPS later?
-    FPSlogicActual = 0 --actual logic per second
-    FPSlogicTimer = 0
+	FPSlogicTarget = 160 --forced FPS otherwise speeds change, maybe adjust speeds relative to FPS later?
+	FPSlogicActual = 0 --actual logic per second
+	FPSlogicTimer = 0
 
-    tickCount = 0
+	tickCount = 0
 
-    tickPeriod = 1/50 -- seconds per tick
+	tickPeriod = 1/50 -- seconds per tick
 	accumulator = 0.0
 
-    nodes = {
-        {
-            x = 50,
-            y = 150,
-            team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-            population = 180,
-            tier = 1,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-            -- regen Delay comes from the tiers table now
-        },
-        {
-            x = arenaWidth -50, 
-            y = 150,
-            team = 1,
-            population = 0,
-            tier = 2,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-        },
-        {
-            x = 50,
-            y = arenaHeight - 200,
-            team = 1,
-            population = 0,
-            tier = 3,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-        },
-        {
-            x = arenaWidth -50,
-            y = arenaHeight - 200,
-            team = 1,
-            population = 0,
-            tier = 4,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-        },
-        {
-            x = arenaWidth / 1.5,
-            y = arenaHeight - 200,
-            team = 3,
-            population = 50,
-            tier = 5,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-        },
-        {
-            x = arenaWidth - 200,
-            y = arenaHeight - 500,
-            team = 3,
-            population = 20,
-            tier = 6,
-            regenTimer = 5,
-            tentaclesUsed = 0,
-            effectTimer = 0, 
-            neutralPower = 20,
-            neutralTeam = 1
-        },
-    }
+	editorNodes = {
+		{
+			x = 50,
+			y = 150,
+			team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+			population = 180,
+			tier = 1,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+			-- regen Delay comes from the tiers table now
+		},
+		{
+			x = arenaWidth -50, 
+			y = 150,
+			team = 1,
+			population = 0,
+			tier = 2,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+		},
+		{
+			x = 50,
+			y = arenaHeight - 200,
+			team = 1,
+			population = 0,
+			tier = 3,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+		},
+		{
+			x = arenaWidth -50,
+			y = arenaHeight - 200,
+			team = 1,
+			population = 0,
+			tier = 4,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+		},
+		{
+			x = arenaWidth / 1.5,
+			y = arenaHeight - 200,
+			team = 3,
+			population = 50,
+			tier = 5,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+		},
+		{
+			x = arenaWidth - 200,
+			y = arenaHeight - 500,
+			team = 3,
+			population = 20,
+			tier = 6,
+			regenTimer = 5,
+			tentaclesUsed = 0,
+			effectTimer = 0, 
+			neutralPower = 20,
+			neutralTeam = 1
+		},
+	}
 
-    walls = {
-    	{
-    		startX = arenaWidth/2,
-    		startY = 500,
-    		endX = 50,
-    		endY = arenaHeight/2
-    	},
-    	{
-    		startX = arenaWidth/3,
-    		startY = 900,
-    		endX = arenaWidth/2,
-    		endY = 600
-    	}
+	nodes = editorNodes
 
-
-    }
-
-    connections = {
-       --[[ {
-            population = 2,
-            team = 1,
-            moving = false,
-            source = 2,
-            sourceEdge = {
-            	x = 200,
-            	y = 200
-            },
-            target = 3,
-            targetEdge = {
-            	x = 200,
-            	y = 200
-            },
-            tentacleEnd = {
-            	x = 200,
-            	y = 200
-            },
-            connectionMidPoint = {
-            	x = 200,
-            	y = 200
-            },
-            linkXStep = 23,
-            linkYStep = 10,
-            links = {
-            	{
-            		x = 200,
-            		y = 200
-            	}
-            },
-            destination = 2,  -- 0 = source, 1 = mid point, 2 = target, 3 = split so source and target
-        	opposedConnectionIndex= 0, -- 0 means no opposed connection
-        	splitLink = 0, -- 0 means no split
-        	glowing = {},
-        	sendTimer
-        }]]
-    }
-
-    teamColours = {
-    	{0.7, 0.7, 0.7, 1},
-    	{0.1, 0.7, 0.1, 1},
-    	{0.7, 0.2, 0.2, 1}
-    }
-
-    darkerTeamColours = {
-    	{0.6, 0.6, 0.6, 1},
-    	{0.0, 0.6, 0.0, 1},
-    	{0.6, 0.1, 0.1, 1}
-    }
-
-    --used in node display
-    nodeDisplayTeamColours = {
-    	{1, 1, 0.6, 1},
-    	{0.3, 1, 0.3, 1},
-    	{1, 0.3, 0.3, 1}
-    }
+	walls = {
+		{
+			startX = arenaWidth/2,
+			startY = 500,
+			endX = 50,
+			endY = arenaHeight/2
+		},
+		{
+			startX = arenaWidth/3,
+			startY = 900,
+			endX = arenaWidth/2,
+			endY = 600
+		}
 
 
-    nodeTiers = { --Tiers change when the population exceeds the min or max
-    	--node.tier is the index of the relevant ranges
-    	-- In the game, lower tiers generate faster
-    	{name = "SPORE", min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
-    	{name = "EMBRYO", min = 6, max = 39, radius = 36, regenDelay =  2.4, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
-    	{name = "PULSAR-A", min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
-    	{name = "PULSAR-B", min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
-    	{name = "ANT", min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
-    	{name = "PREDATOR", min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
-    }	-- regen halfs per tentacle roughly
+	}
 
-    buttons = {
-    	{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
-    	{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
-    	{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
-    	{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" },   -- circle
-    	{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30, shape = "rectangle"},
-    	{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
-    	{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
-    	{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
-    	{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
-    }
-    -- all level buttons
-    for i = 1, 19 do
-		table.insert(buttons, {name = i+1, x= arenaWidth/2+270*(math.sin(2*math.pi*i/20)),  y= arenaHeight/2-270*(math.cos(2*math.pi*i/20)), width=35, height=35, shape = "circle"})
+	connections = {
+	   --[[ {
+			population = 2,
+			team = 1,
+			moving = false,
+			source = 2,
+			sourceEdge = {
+				x = 200,
+				y = 200
+			},
+			target = 3,
+			targetEdge = {
+				x = 200,
+				y = 200
+			},
+			tentacleEnd = {
+				x = 200,
+				y = 200
+			},
+			connectionMidPoint = {
+				x = 200,
+				y = 200
+			},
+			linkXStep = 23,
+			linkYStep = 10,
+			links = {
+				{
+					x = 200,
+					y = 200
+				}
+			},
+			destination = 2,  -- 0 = source, 1 = mid point, 2 = target, 3 = split so source and target
+			opposedConnectionIndex= 0, -- 0 means no opposed connection
+			splitLink = 0, -- 0 means no split
+			glowing = {},
+			sendTimer
+		}]]
+	}
+
+	teamColours = {
+		{0.7, 0.7, 0.7, 1},
+		{0.1, 0.7, 0.1, 1},
+		{0.7, 0.2, 0.2, 1}
+	}
+
+	darkerTeamColours = {
+		{0.6, 0.6, 0.6, 1},
+		{0.0, 0.6, 0.0, 1},
+		{0.6, 0.1, 0.1, 1}
+	}
+
+	--used in node display
+	nodeDisplayTeamColours = {
+		{1, 1, 0.6, 1},
+		{0.3, 1, 0.3, 1},
+		{1, 0.3, 0.3, 1}
+	}
+
+
+	nodeTiers = { --Tiers change when the population exceeds the min or max
+		--node.tier is the index of the relevant ranges
+		-- In the game, lower tiers generate faster
+		{name = "SPORE", min = -20, max = 14, radius = 33, regenDelay =  2, sendDelay = 1.8, maxTentacles = 1}, -- spore regen 40s: 0 tents: 1/1.5	 1:	1/2	2:-		delivery:	23 in 40s  -delivery is the per tentacle rate and does not vary
+		{name = "EMBRYO", min = 6, max = 39, radius = 36, regenDelay =  2.4, sendDelay = 1.2, maxTentacles = 2}, -- embryo				17			9		4				37
+		{name = "PULSAR-A", min = 31, max = 79, radius = 43, regenDelay =  2.5, sendDelay = 1, maxTentacles = 2},	-- pulsar-A				15			7		3				49
+		{name = "PULSAR-B", min = 61, max = 119, radius = 51, regenDelay =  3, sendDelay = 1, maxTentacles = 2},	-- pulsar-B				13			7		4				72
+		{name = "ANT", min = 101, max = 159, radius = 60, regenDelay =  4, sendDelay = 0.5, maxTentacles = 3},	-- Ant				9			5		2				109
+		{name = "PREDATOR", min = 141, max = 220, radius = 72, regenDelay = 5, sendDelay = 0.15, maxTentacles = 3}	-- Predator				7			5		1				260: ~66 in 10s, 130 in 20s -  delay per tents: 0=5, 1=10, 2=20
+	}	-- regen halfs per tentacle roughly
+
+	allButtons = {
+		{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+		{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+		{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+		{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" },   -- circle
+		{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30, shape = "rectangle"},
+		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
+		{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
+		{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
+		{name = "Editor", x=arenaWidth/2,y=arenaHeight/2, width=80, height=30, shape = "rectangle"}, 
+		--10 vv
+		{name = "CreateX", x=2,y=2, width=256, height=60, shape = "rectangle"}, 
+		{name = "MicrobeTeam", x=80,y=170, width=200, height=30, shape = "rectangle"}, 
+		{name = "PowerSlider", x=80,y=220, width=200, height=20, shape = "rectangle"}, 
+		{name = "DeleteX", x=80,y=270, width=200, height=30, shape = "rectangle"}, 
+		{name = "Test&Edit", x=arenaWidth*0.9, y=arenaHeight-30, width=80, height=30, shape = "rectangle"},
+		{name = "Create Microbe", x=0,y=140, width=260, height=40, shape = "rectangle"}, 
+		{name = "Create Wall", x=0,y=180, width=260, height=40, shape = "rectangle"}, 
+
+		{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2+50-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
+	}
+	--editor, unlock, and level 1, and adds the other levels later
+	menuButtons = {allButtons[8], allButtons[9], allButtons[#allButtons]}
+
+
+
+	-- all level buttons
+	for i = 1, 19 do
+		table.insert(allButtons , {name = i+1, x= arenaWidth/2+270*(math.sin(2*math.pi*i/20)),  y= arenaHeight/2+50-270*(math.cos(2*math.pi*i/20)), width=35, height=35, shape = "circle"})
+		table.insert(menuButtons, allButtons[#allButtons])
 	end
 
-    buttonsOnScreen = { 
-    	{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
-    	{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
-    	{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
-    	{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
-	    {name = "God", x=arenaWidth*0.7,y=30, width=50, height=30, shape = "rectangle"}, 
-	    {name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
-	    {name = "Complete", x=10,y=30, width=80, height=30, shape = "rectangle"} 
+	-- 4 standard and my extra ones -complete, AI, God
+	controlBarButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[5], allButtons[6],allButtons[7]}
+
+	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14] }
+
+	buttonsOnScreen = { 
+		{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+		{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+		{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
+		{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
+		{name = "God", x=arenaWidth*0.7,y=30, width=50, height=30, shape = "rectangle"}, 
+		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
+		{name = "Complete", x=10,y=30, width=80, height=30, shape = "rectangle"} 
 	}
+
+	
 
 	levelProgress = {1,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3} -- 1 = unlocked, 2 = completed, 3 = locked --to match team colours
 
-    -- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
+	-- OLD:  -- distance between node 1 and 2 can be found as nodeDistances[1][2] or nodeDistances[2][1], [1][1] is always 0, walls will make it 7000
 
 	-- NEW: table [1] is the distances from node 1 in order of distance, {distance, targetNode}. so when AI is looking at node 1's options look at if the distance: nodeDistances[1][1][2] is acceptable then create connection to node: nodeDistances[1][1][1]
-    -- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
-    -- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
-    -- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
-    nodeDistances = { 
-        	--[[ {  {2,261},{4,300},{3,500} },
+	-- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
+	-- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
+	-- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
+	nodeDistances = { 
+			--[[ {  {2,261},{4,300},{3,500} },
 		{  {1,261},{4,350},{3,400} },     etc    ]]
-    }
-    calculateNodeDistances()
+	}
+	calculateNodeDistances()
 
 
-    function isMouseInButton()
-        
-    	for buttonIndex, button in ipairs(buttonsOnScreen) do
-	    	if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height then
-				print(button.name, " button pressed")
-				return buttonIndex
+	function isMouseInButton()
+		
+		for buttonIndex, button in ipairs(buttonsOnScreen) do
+			if button.shape == "rectangle" then
+				if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width/2 and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height/2 then
+					--print(button.name, " button pressed")
+					return buttonIndex
+				end
+			else --circle
+				if distancebetween(love.mouse.getX(), love.mouse.getY(), button.x, button.y) < button.width+5 then
+					--print(button.name, " button pressed")
+					return buttonIndex
+				end
 			end
 
 		end
 
 		return 0
-        -- return button selected
-    end
+		-- return button selected
+	end
 
 
-    function isMouseInNode()
-        
-    	for nodeIndex, node in ipairs(nodes) do
-	    	if distancebetween(love.mouse.getX(), love.mouse.getY(), node.x, node.y) < nodeTiers[node.tier].radius+10 then
+	function isMouseInNode()
+		
+		for nodeIndex, node in ipairs(nodes) do
+			--print( node.x, node.y)
+			if distancebetween(love.mouse.getX(), love.mouse.getY(), node.x, node.y) < nodeTiers[node.tier].radius+10 then
 				return nodeIndex
 			end
 
@@ -295,8 +334,8 @@ function love.load()
 
 		return 0
 
-        -- return nodeSelected
-    end
+		-- return nodeSelected
+	end
 
 
 
@@ -311,34 +350,34 @@ end
 
 
 function findIntersectionPoint(x1, y1, x2, y2, x3, y3, x4, y4)
-    -- Calculate the differences
-    local dx1 = x2 - x1
-    local dy1 = y2 - y1
-    local dx2 = x4 - x3
-    local dy2 = y4 - y3
-    
-    -- Calculate the determinants
-    local det = dx1 * dy2 - dy1 * dx2
-    
-    -- If the determinant is zero, the lines are parallel
-    if det == 0 then
-        return nil, nil -- No intersection
-    end
-    
-    -- Calculate the parameters for the intersection point
-    local u = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / det
-    local v = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / det
-    
-    -- Check if the intersection point is within both line segments
-    if u < 0 or u > 1 or v < 0 or v > 1 then
-        return nil, nil -- No intersection within the bounds of the segments
-    end
-    
-    -- Calculate the intersection point
-    local ix = x1 + u * dx1
-    local iy = y1 + u * dy1
-    
-    return ix, iy
+	-- Calculate the differences
+	local dx1 = x2 - x1
+	local dy1 = y2 - y1
+	local dx2 = x4 - x3
+	local dy2 = y4 - y3
+	
+	-- Calculate the determinants
+	local det = dx1 * dy2 - dy1 * dx2
+	
+	-- If the determinant is zero, the lines are parallel
+	if det == 0 then
+		return nil, nil -- No intersection
+	end
+	
+	-- Calculate the parameters for the intersection point
+	local u = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / det
+	local v = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / det
+	
+	-- Check if the intersection point is within both line segments
+	if u < 0 or u > 1 or v < 0 or v > 1 then
+		return nil, nil -- No intersection within the bounds of the segments
+	end
+	
+	-- Calculate the intersection point
+	local ix = x1 + u * dx1
+	local iy = y1 + u * dy1
+	
+	return ix, iy
 end
 
 
@@ -456,24 +495,27 @@ function love.update(dt)
 	end
 	FPSlogicTimer = FPSlogicTimer + dt
 
-	for nodeIndex, node in ipairs(nodes) do
-		if node.team > 1 then
-			node.regenTimer = node.regenTimer - dt
-		end
-		if node.effectTimer > 0 then
-			node.effectTimer = node.effectTimer - dt
+	--node regen
+	if not editor then
+		for nodeIndex, node in ipairs(nodes) do
+			if node.team > 1 then
+				node.regenTimer = node.regenTimer - dt
+			end
+			if node.effectTimer > 0 then
+				node.effectTimer = node.effectTimer - dt
+			end
 		end
 	end
 
 
 
 
-	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, maybe add a check for if the accumulator gets too high causing the game to be superfast for too long
-  	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run target
+	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, theres a check at the end for if the accumulator gets too high causing the game to be superfast for too long
+	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run target
 
-    	tickCount = tickCount + 1
+		tickCount = tickCount + 1
 		
-    	if FPSlogicTimer >0.6 then
+		if FPSlogicTimer >0.6 then
 			FPSlogicActual = math.floor(tickCount/FPSlogicTimer+0.5)
 		end
 
@@ -501,10 +543,11 @@ function love.update(dt)
 
 		end
 
+
 		-- print(timer)
 
 		-- regen
-		 	-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
+			-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
 		for nodeIndex, node in ipairs(nodes) do
 			if node.team > 1 then
 				if node.regenTimer < 0 then --regentimer updates EVERY loop not every logic update
@@ -543,8 +586,29 @@ function love.update(dt)
 			end
 		end
 
+		--nodeSelected = isMouseInNode()
+		if love.mouse.isDown(1) and nodeSelected > 0 and editor then
+			nodes[nodeSelected].x = love.mouse.getX()
+			nodes[nodeSelected].y = love.mouse.getY()
 
+			pointSelected = {x = 0, y = 0}
+		elseif nodeSelected == 0 then
+			--pointSelected = {x = love.mouse.getX(), y = love.mouse.getY()}
+		end
 
+		--draggin
+		--local buttonSelected = isMouseInButton()
+		if editor and love.mouse.isDown(1) and dragging then
+			--if buttonsOnScreen[buttonSelected].name == "PowerSlider" then
+			
+			buttonsOnScreen[4].x = love.mouse.getX()-buttonsOnScreen[4].width/2
+			if buttonsOnScreen[4].x < 50 then
+				buttonsOnScreen[4].x = 50
+			elseif buttonsOnScreen[4].x > 250 then
+				buttonsOnScreen[4].x = 250
+			end
+			--end
+		end
 		
 		-- move this to run only when a cut, node-loss, or new connection is made
 		checkOpposedConnections()
@@ -552,7 +616,7 @@ function love.update(dt)
 		
 		updateMovingConnections() --main update processes
 
-		if AION then
+		if AION then	--ie AI ON
 			enemyAI()
 		end
 
@@ -564,7 +628,7 @@ function love.update(dt)
 		if accumulator > 1 then		--limit catchup
 			accumulator = 1
 		end
-  	end
+	end
 end
 
 
@@ -971,27 +1035,27 @@ function createConnection(sourceNode, targetNode)
 		population = nodes[sourceNode].population, team = nodes[sourceNode].team, moving = true, source = sourceNode, 
 		sourceEdge = { x = edges.sourceX, y = edges.sourceY }, 
 		target = targetNode,
-        targetEdge = {
-        	x = edges.targetX, 
-        	y = edges.targetY
-        },
-        tentacleEnd = {
-        	x = edges.sourceX, 
-        	y = edges.sourceY
-        },
-        connectionMidPoint = {
-        	x = (edges.sourceX + edges.targetX)/2,
-        	y = (edges.sourceY + edges.targetY)/2
-        },
-        linkXStep = linkSteps.x,
-        linkYStep = linkSteps.y,
-        links = {
-        },
-        destination = 2,
-        opposedConnectionIndex= 0,
-        splitLink = 0,
-        glowing = {},
-        sendTimer = nodeTiers[nodes[sourceNode].tier].sendDelay
+		targetEdge = {
+			x = edges.targetX, 
+			y = edges.targetY
+		},
+		tentacleEnd = {
+			x = edges.sourceX, 
+			y = edges.sourceY
+		},
+		connectionMidPoint = {
+			x = (edges.sourceX + edges.targetX)/2,
+			y = (edges.sourceY + edges.targetY)/2
+		},
+		linkXStep = linkSteps.x,
+		linkYStep = linkSteps.y,
+		links = {
+		},
+		destination = 2,
+		opposedConnectionIndex= 0,
+		splitLink = 0,
+		glowing = {},
+		sendTimer = nodeTiers[nodes[sourceNode].tier].sendDelay
 	})
 
 	-- link creation
@@ -1027,6 +1091,12 @@ end
 
 
 function love.mousereleased(mouseX, mouseY)
+
+	love.mouse.setCursor()
+
+	if dragging then
+		dragging = false
+	end
 
 	local releasenode = isMouseInNode()
 
@@ -1064,7 +1134,7 @@ function love.mousereleased(mouseX, mouseY)
 
 
 	-- cutting a connection
-	elseif (nodeSelected == 0 and pointSelected ~= 0) then
+	elseif (nodeSelected == 0 and pointSelected.x ~= 0) then
 		local releaseMouseX = love.mouse.getX()
 		local releaseMouseY = love.mouse.getY()
 		-- check every connection for an intersection, allows multiple cut lines
@@ -1130,16 +1200,42 @@ end
 
 
 function love.mousepressed(mouseX, mouseY)
+
+	love.mouse.setCursor(cursor)
 	
 	nodeSelected = isMouseInNode() 
 
-	if nodeSelected < 1 then
+	local buttonSelected = isMouseInButton()
+
+	if nodeSelected < 1 and buttonSelected < 1 then
 		pointSelected = {x = mouseX, y = mouseY}
-	else
-		pointSelected = 0
+		if editor then
+			--create node of type specified 
+			table.insert(nodes, {x = mouseX,
+				y = mouseY,
+				team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+				population = 50,
+				tier = 3,
+				regenTimer = 5,
+				tentaclesUsed = 0,
+				effectTimer = 0, 
+				neutralPower = 30,
+				neutralTeam = 1 
+				})
+			pointSelected = {x = 0, y = 0}
+			nodeSelected = isMouseInNode()
+
+		end
+	elseif nodeSelected > 0 and buttonSelected < 1 then
+		pointSelected = {x = 0, y = 0}
+
+		if editor then
+			nodes[nodeSelected].x = mouseX
+			nodes[nodeSelected].y = mouseY
+		end
 	end
 
-	local buttonSelected = isMouseInButton()
+	
 
 	--menu interactions
 	if buttonSelected > 0 then
@@ -1154,25 +1250,24 @@ function love.mousepressed(mouseX, mouseY)
 
 			calculateNodeDistances()
 
-			for b = #buttonsOnScreen, 1, -1 do
-				if type(buttonsOnScreen[b].name) ~= "string" then
-					print("Removed: ", buttonsOnScreen[b].name, #buttonsOnScreen)
-					table.remove(buttonsOnScreen, b) 
-				end
-			end
+			buttonsOnScreen = {}
+
+			for b = 1, #controlBarButtons do
+				table.insert(buttonsOnScreen, controlBarButtons[b])
+			end	
 
 		elseif buttonsOnScreen[buttonSelected].name == "Menu" then
 			currentLevel = 0
+			editor = false
+			print("EDITOR MODE OFF")
 			current_background = menu_background
 			connections = {}
 			nodes = {}
 			walls = {}
 			print("buttons on screen: ", #buttonsOnScreen)
-			if #buttonsOnScreen < #buttons then
-				buttonsOnScreen = {}
-				for b = 1, #buttons do
-					table.insert(buttonsOnScreen, buttons[b])
-				end
+			buttonsOnScreen = {}
+			for b = 1, #menuButtons do
+				table.insert(buttonsOnScreen, menuButtons[b])
 			end
 			print("buttons on screen: ", #buttonsOnScreen)
 
@@ -1182,9 +1277,10 @@ function love.mousepressed(mouseX, mouseY)
 			AION = not AION
 		elseif buttonsOnScreen[buttonSelected].name == "Complete" then
 			levelProgress[currentLevel] = 2
+			--unlocks next level
 			levelProgress[currentLevel+1] = 1
-			buttons[#buttons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
-			buttons[#buttons-20+currentLevel+1].y = arenaHeight/2-330*(math.cos(2*math.pi*(currentLevel)/20))
+			menuButtons[#menuButtons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
+			menuButtons[#menuButtons-20+currentLevel+1].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(currentLevel)/20))
 		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
 			connections = {}
 			nodeDistances = {}
@@ -1197,10 +1293,54 @@ function love.mousepressed(mouseX, mouseY)
 			for level, progressNumber in ipairs(levelProgress) do
 				if progressNumber == 3 then
 					levelProgress[level] = 1
-					buttons[#buttons-20+level].x = arenaWidth/2+330*(math.sin(2*math.pi*(level-1)/20))
-					buttons[#buttons-20+level].y = arenaHeight/2-330*(math.cos(2*math.pi*(level-1)/20))
+					menuButtons[#menuButtons-20+level].x = arenaWidth/2+330*(math.sin(2*math.pi*(level-1)/20))
+					menuButtons[#menuButtons-20+level].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(level-1)/20))
 				end
 			end
+
+		elseif buttonsOnScreen[buttonSelected].name == "Editor" then
+			current_background = game_background
+			connections = {}
+			nodes = {}
+			walls = {}
+			editor = true
+			print("EDITOR MODE ON")
+			buttonsOnScreen = editorButtons
+			--[[table.insert(buttonsOnScreen, allButtons[14])
+			for b = 1, #controlBarButtons do
+				table.insert(buttonsOnScreen, controlBarButtons[b])
+			end	]]
+
+		elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
+			connections = {}
+			editor = not editor
+			if editor then
+				nodes = editorNodes 
+
+				buttonsOnScreen = editorButtons
+			else
+				editorNodes = nodes
+
+				buttonsOnScreen = controlBarButtons
+				table.insert(buttonsOnScreen, allButtons[14])
+			end
+			
+		elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
+
+			table.insert(buttonsOnScreen, allButtons[15])
+			table.insert(buttonsOnScreen, allButtons[16])
+
+		elseif buttonsOnScreen[buttonSelected].name == "Create Microbe" then
+			createMicrobe = true
+			buttonsOnScreen = editorButtons
+		elseif buttonsOnScreen[buttonSelected].name == "Create Wall" then
+			createMicrobe = false
+			buttonsOnScreen = editorButtons
+		elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
+			dragging = true
+			buttonsOnScreen[buttonSelected].x = love.mouse.getX()
+
+
 		else
 
 
@@ -1255,9 +1395,9 @@ function enemyAI()
 
 	
 	-- NEW: table [1] is the distances from node 1 in order of distance, {distance, targetNode}. so when AI is looking at node 1's options look at if the distance: nodeDistances[1][1][2] is acceptable then create connection to node: nodeDistances[1][1][1]
-    -- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
-    -- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
-    -- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
+	-- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
+	-- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
+	-- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
 
 
 	for nodeIndex, node in ipairs(nodes) do
@@ -1304,7 +1444,7 @@ function enemyAI()
 							if wallIntersection == false and connectionAlreadyExists == false then
 
 								--create connection
-								print(targetNodeAndDistance[1])
+								--print(targetNodeAndDistance[1])
 								createConnection(nodeIndex, targetNodeAndDistance[1])
 								--print("break!")
 								break
@@ -1389,7 +1529,7 @@ function love.draw(mouseX, mouseY)
 	
 
 	--grey control bar at the bottom
-	if currentLevel > 0 then
+	if current_background == game_background then
 		love.graphics.setColor(0,0,0,0.6)
 		love.graphics.rectangle('fill', 0, arenaHeight-60, arenaWidth, arenaHeight)
 
@@ -1398,17 +1538,42 @@ function love.draw(mouseX, mouseY)
 		love.graphics.printf("Tentacle Wars - Remake", arenaWidth/2-200, arenaHeight-50, 400 , 'center')
 	end
 
-	love.graphics.setFont(font14)
+	--editor bar
+	if editor then
+		love.graphics.setColor(0.1,0.2,0.2)
+		love.graphics.rectangle('fill', 0, 0, arenaWidth, 60)
+
+	end
+
+	love.graphics.print("hi", 200,200)
 
 	--menu
-	if currentLevel == 0 then
+	if current_background == menu_background then
+
+		--title
+		love.graphics.setFont(titlefont)
+		--black outline:
+		love.graphics.setColor(0,0,0)
+		love.graphics.printf("Tentacle Wars", 0-5, 30, arenaWidth , 'center')
+		love.graphics.printf("Tentacle Wars", 0+5, 30, arenaWidth , 'center')
+		love.graphics.printf("Tentacle Wars", 0, 30+5, arenaWidth , 'center')
+		love.graphics.printf("Tentacle Wars", 0, 30-5, arenaWidth , 'center')
+
+
+		--title in white
 		love.graphics.setColor(1,1,1)
-		love.graphics.circle('line',arenaWidth/2,arenaHeight/2,180)
+		love.graphics.printf("Tentacle Wars", 0, 30, arenaWidth , 'center')
+		
+		--level display inner circle and lines
+		love.graphics.setColor(1,1,1)
+		love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180)
 		for i = 0, 19 do
-			love.graphics.line(arenaWidth/2+180*(math.sin(2*math.pi*i/20)),   arenaHeight/2-180*(math.cos(2*math.pi*i/20)), 
-				arenaWidth/2+ ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.sin(2*math.pi*i/20)),    arenaHeight/2- ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.cos(2*math.pi*i/20)) )
+			love.graphics.line(arenaWidth/2+180*(math.sin(2*math.pi*i/20)),   arenaHeight/2+50-180*(math.cos(2*math.pi*i/20)), 
+				arenaWidth/2+ ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.sin(2*math.pi*i/20)),    arenaHeight/2+50- ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.cos(2*math.pi*i/20)) )
 		end
 	end
+
+	love.graphics.setFont(font14)
 
 	--draw buttons
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
@@ -1423,13 +1588,26 @@ function love.draw(mouseX, mouseY)
 				love.graphics.setColor(0,0.5,0)
 			end
 		end
+		if button.name == "test&Edit" then
+			if editor then
+				love.graphics.setColor(0,0.5,0)
+			end
+		end
 
 		love.graphics.setLineWidth(3)
 
 		if button.shape == "rectangle" then
-			love.graphics.rectangle('fill',button.x,button.y,button.width, button.height)
+			love.graphics.rectangle('fill',button.x,button.y,button.width, button.height,button.height/5,button.height/5)
 			love.graphics.setColor(1,1,1)
-			love.graphics.print(button.name,button.x,button.y)
+			if button.name == "CreateX" then
+				if createMicrobe then
+					love.graphics.print("Create Microbe",button.x,button.y)
+				else
+					love.graphics.print("Create Wall",button.x,button.y)
+				end
+			else
+				love.graphics.print(button.name,button.x,button.y)
+			end
 		elseif button.shape == "circle" then
 
 			if type(button.name) ~= "string" then
@@ -1442,7 +1620,14 @@ function love.draw(mouseX, mouseY)
 				love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
 				love.graphics.setFont(font14)
 				teamColours[levelProgress[button.name]][4] = 1
+
+				
+			--[[elseif currentLevel > 0 then
+				--control bar buttons
+				love.graphics.setColor(1,1,1)
+				love.graphics.circle('line',button.x,button.y,button.height)]]
 			end
+
 			--border
 			love.graphics.setColor(1,1,1)
 			love.graphics.circle('line',button.x,button.y,button.height)
@@ -1489,10 +1674,28 @@ function love.draw(mouseX, mouseY)
 
 
 	--highlight
-	local highlightedNode = isMouseInNode()
-	if highlightedNode > 0 then
+	if not editor then
+		local highlightedNode = isMouseInNode()
+		if highlightedNode > 0 then
+			love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+			love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius)
+		end
+	--[[elseif nodeSelected > 0 then
 		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
-		love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius)
+		love.graphics.circle('fill', nodes[nodeSelected].x, nodes[nodeSelected].y, nodeTiers[nodes[highlightedNode].tier].radius)]]
+	end
+
+	local highlightedButton = isMouseInButton()
+	if highlightedButton > 0 then
+		love.mouse.setCursor(cursor)
+		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+		if buttonsOnScreen[highlightedButton].shape == "circle" then
+			love.graphics.circle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width)
+		else
+			love.graphics.rectangle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width, buttonsOnScreen[highlightedButton].height,5,5)
+		end
+	else
+		love.mouse.setCursor()
 	end
 
 	-- node ping affect on change
@@ -1678,6 +1881,7 @@ function love.draw(mouseX, mouseY)
 			love.graphics.setColor(weakColour)
 		end
 		-- draw node
+		--print(node.x, node.y)
 		love.graphics.circle('fill', node.x, node.y, nodeCentreRadius)
 		love.graphics.setColor(teamColours[node.team])
 		-- node border
@@ -1687,14 +1891,14 @@ function love.draw(mouseX, mouseY)
 		-- outer node ring
 		love.graphics.circle('line', node.x, node.y, nodeTiers[node.tier].radius)
 
-	 	--node feelers and wobblers
-	 	love.graphics.setLineWidth( 1 )
-	 	
-	 		
+		--node feelers and wobblers
+		love.graphics.setLineWidth( 1 )
+		
+			
 		for i = 1, 8 do
-		 	if node.tier > 1 then
-		 		if node.tier == 2 then
-			 		--node feelers
+			if node.tier > 1 then
+				if node.tier == 2 then
+					--node feelers
 					love.graphics.line(node.x, node.y-(nodeTiers[node.tier].radius), 
 						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeTiers[node.tier].radius)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
 						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeTiers[node.tier].radius)-5+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
@@ -1906,6 +2110,10 @@ function love.draw(mouseX, mouseY)
 			distanceDiff, -10)]]
 
 		local wallPoints = {
+
+			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2, --wall-end, start side
+			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2,
+
 			0,10, -- wall.startX, wall.startY
 			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
 			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
@@ -1920,11 +2128,10 @@ function love.draw(mouseX, mouseY)
 			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
 			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
 			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
-			0,-10,
+			0,-10
 
 			
-			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2, --wall-end, start side
-			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2
+			
 		
 		}
 
@@ -1952,111 +2159,121 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setColor(0.8, 0.8, 0)
 	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
-		if nodeSelected > 0 and pointSelected == 0 and (nodes[nodeSelected].team == 2 or godModeON) then
-			love.graphics.setColor(0.8, 0.8, 0)
-			love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
+		if (editor == false) then
+			if nodeSelected > 0  and (nodes[nodeSelected].team == 2 or godModeON) then -- and pointSelected.x == 0
+				love.graphics.setColor(0.8, 0.8, 0)
+				love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
 
-			local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
-			--print(angle/(2*math.pi) )
+				local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
+				--print(angle/(2*math.pi) )
 
-			--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
-			love.graphics.translate(love.mouse.getX(), love.mouse.getY())
-			love.graphics.rotate(-angle)
+				--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
+				love.graphics.translate(love.mouse.getX(), love.mouse.getY())
+				love.graphics.rotate(-angle)
 
-			love.graphics.line(0, 0,0,50)
+				love.graphics.line(0, 0,0,50)
 
-			love.graphics.line(0,0,-10,10)
-			love.graphics.circle('fill',-10,10,2.5)
-			love.graphics.line(0,0,-10,-10)
-			love.graphics.circle('fill',-10,-10,2.5)
+				love.graphics.line(0,0,-10,10)
+				love.graphics.circle('fill',-10,10,2.5)
+				love.graphics.line(0,0,-10,-10)
+				love.graphics.circle('fill',-10,-10,2.5)
 
-			love.graphics.translate(-love.mouse.getX(), -love.mouse.getY())
+				love.graphics.translate(-love.mouse.getX(), -love.mouse.getY())
 
-			-- unrotates and resets origin  
-			love.graphics.origin()
+				-- unrotates and resets origin  
+				love.graphics.origin()
 
 
-			--love.graphics.line(500,0,500,500)
+				--love.graphics.line(500,0,500,500)
 
-		elseif nodeSelected == 0 then
-			love.graphics.setColor(0.8, 0, 0)
-			love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY())
-			--get angle of red line
-			--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
+			elseif (editor == false) and nodeSelected == 0 and pointSelected.x ~= 0 then --shouldnt need not editor again
+				love.graphics.setColor(0.8, 0, 0)
+				print(pointSelected.x,pointSelected.y)
+				love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY()) 
+				--get angle of red line
+				--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
+
+			end
+
+		elseif nodeSelected > 0 then -- this needs to move to update not draw
+			--nodes[nodeSelected].x = mouseX
+			--nodes[nodeSelected].y = mouseY
 
 		end
 	end
 
 	--hover node display
-	local mouseNode = isMouseInNode()
-	if mouseNode > 0 then
-		local Xshift = 0
-		local Yshift = 20 + (1.5*nodeTiers[nodes[mouseNode].tier].radius)
+	if not editor then
+		local mouseNode = isMouseInNode()
+		if mouseNode > 0 then
+			local Xshift = 0
+			local Yshift = 20 + (1.5*nodeTiers[nodes[mouseNode].tier].radius)
 
-		--shift display depending on where the node is
-		--shift if near edge
-		if nodes[mouseNode].x < 100 then
-			Xshift = Xshift+100
-		elseif nodes[mouseNode].x > arenaWidth- 100 then
-			Xshift = Xshift-100
+			--shift display depending on where the node is
+			--shift if near edge
+			if nodes[mouseNode].x < 100 then
+				Xshift = Xshift+100
+			elseif nodes[mouseNode].x > arenaWidth- 100 then
+				Xshift = Xshift-100
+			end
+			--shift above or below
+			if nodes[mouseNode].y > 100+arenaHeight/2 then
+				Yshift = -Yshift-60
+			end
+
+			--hover node display
+			love.graphics.setColor(0.1, 0.1, 0.1)
+			love.graphics.rectangle('fill', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
+
+			--border
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			love.graphics.setLineWidth( 1 )
+			love.graphics.rectangle('line', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
+
+
+
+			love.graphics.setFont(font21)
+			love.graphics.setColor(0.7, 0.7, 0.7)
+			--love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
+			love.graphics.print("CLASS: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
+			love.graphics.setColor(nodeDisplayTeamColours[nodes[mouseNode].team])
+			love.graphics.print(nodeTiers[nodes[mouseNode].tier].name, 90+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
+
+			-- if neutral display progress, otherwise show used tentacles
+			if nodes[mouseNode].team > 1 then
+
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+				love.graphics.setColor(1,1,0.1)
+				love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
+
+				love.graphics.print("TENTACLES: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+				love.graphics.setColor(1,1,0.1)
+				love.graphics.print(nodes[mouseNode].tentaclesUsed, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				love.graphics.print("/"..nodeTiers[nodes[mouseNode].tier].maxTentacles, 153+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+			else
+
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+				love.graphics.setColor(1,1,0.1)
+				love.graphics.print(nodes[mouseNode].neutralPower, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
+
+				love.graphics.print("OCCUPIED: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+				love.graphics.setColor(1,1,0.1)
+				love.graphics.print(nodes[mouseNode].population, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				love.graphics.print("/"..math.floor(nodes[mouseNode].neutralPower/3), 165+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
+
+			end
+
+
+
 		end
-		--shift above or below
-		if nodes[mouseNode].y > 100+arenaHeight/2 then
-			Yshift = -Yshift-60
-		end
-
-		--hover node display
-		love.graphics.setColor(0.1, 0.1, 0.1)
-		love.graphics.rectangle('fill', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
-
-		--border
-		love.graphics.setColor(0.7, 0.7, 0.7)
-		love.graphics.setLineWidth( 1 )
-		love.graphics.rectangle('line', nodes[mouseNode].x+Xshift-110, nodes[mouseNode].y+Yshift, 220, 80)
-
-
-
-		love.graphics.setFont(font21)
-		love.graphics.setColor(0.7, 0.7, 0.7)
-		--love.graphics.printf(node.population, node.x-nodeTiers[node.tier].radius, node.y-19, 2*nodeTiers[node.tier].radius, "center")
-		love.graphics.print("CLASS: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
-		love.graphics.setColor(nodeDisplayTeamColours[nodes[mouseNode].team])
-		love.graphics.print(nodeTiers[nodes[mouseNode].tier].name, 90+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift)
-
-		-- if neutral display progress, otherwise show used tentacles
-		if nodes[mouseNode].team > 1 then
-
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
-			love.graphics.setColor(1,1,0.1)
-			love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
-
-			love.graphics.print("TENTACLES: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-			love.graphics.setColor(1,1,0.1)
-			love.graphics.print(nodes[mouseNode].tentaclesUsed, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			love.graphics.print("/"..nodeTiers[nodes[mouseNode].tier].maxTentacles, 153+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-		else
-
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			love.graphics.print("POWER: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
-			love.graphics.setColor(1,1,0.1)
-			love.graphics.print(nodes[mouseNode].neutralPower, 100+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+25)
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			--love.graphics.print(nodes[mouseNode].population, 100+nodes[mouseNode].x+Xshift-125, 2+nodes[mouseNode].y+Yshift+25)
-
-			love.graphics.print("OCCUPIED: ", 5+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-			love.graphics.setColor(1,1,0.1)
-			love.graphics.print(nodes[mouseNode].population, 140+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-			love.graphics.setColor(0.7, 0.7, 0.7)
-			love.graphics.print("/"..math.floor(nodes[mouseNode].neutralPower/3), 165+nodes[mouseNode].x+Xshift-110, 2+nodes[mouseNode].y+Yshift+50)
-
-		end
-
-
-
 	end
 
 end

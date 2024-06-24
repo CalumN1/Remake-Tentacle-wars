@@ -12,8 +12,6 @@ To Do List
 
 - 	use points to add more effects e.g. circling tentacles or nodes
 
--	fix walls: fill shape different from border shape ????
-
 -	other AI Improvements?
 
 	-	slow down enemy AI ? a bit more maybe?
@@ -34,7 +32,7 @@ To Do List
 
 -	add upto level 20
 
-- 	add control bar at the bottom
+- 	add control bar icons at the bottom
 
 - 	add timer
 
@@ -47,9 +45,13 @@ To Do List
 -	fix initial glow delivery burst
 
 
--	create a menu
+-	Improve menu
 
--	menu transition fade
+	-	control bar buttons curently go invisible, should be removed from buttons on screen table
+
+	-	add menu wigglers - randomized each time
+
+	-	menu transition fade
 
 -	create an editor 
 
