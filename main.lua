@@ -19,6 +19,12 @@ function love.load()
 
 	current_background = game_background
 
+	image_QuitMenuButton = love.graphics.newImage('QuitMenuButton.png')
+	image_MuteButton = love.graphics.newImage('MuteButton.png')
+	image_PauseButton = love.graphics.newImage('PauseButton.png')
+	image_ResetButton = love.graphics.newImage('ResetButton.png')
+
+
 	cursor = love.mouse.getSystemCursor("hand")
 
 	currentLevel = 100 -- 0 means menu
@@ -30,6 +36,13 @@ function love.load()
 	editor = false
 	createMicrobe = true
 	dragging = false
+	pause = false
+
+	editPower = 10
+	editTeam = 2
+	editorSelected = {node = true, index = 1}
+
+	menuWigglerSeed = {}
 
 	mousePosDelay = {x=0,y=0} --index = how many seconds ago it was there
 	mouseDelayTimer = 0
@@ -254,6 +267,9 @@ function love.load()
 		{name = "Test&Edit", x=arenaWidth*0.9, y=arenaHeight-30, width=80, height=30, shape = "rectangle"},
 		{name = "Create Microbe", x=0,y=140, width=260, height=40, shape = "rectangle"}, 
 		{name = "Create Wall", x=0,y=180, width=260, height=40, shape = "rectangle"}, 
+		{name = "Green", x=80,y=200, width=200, height=30, shape = "rectangle"}, 
+		{name = "Red", x=80,y=230, width=200, height=30, shape = "rectangle"}, 
+		{name = "Neutral", x=80,y=260, width=200, height=30, shape = "rectangle"}, 
 
 		{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2+50-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
 	}
@@ -337,6 +353,21 @@ function love.load()
 		-- return nodeSelected
 	end
 
+	function isMouseInWall()
+		--for the editor, moving walls
+		for wallIndex, wall in ipairs(walls) do
+			--print( node.x, node.y)
+			if distancebetween(love.mouse.getX(), love.mouse.getY(), wall.startX, wall.startY) < 70 then
+				--print(button.name, " button pressed")
+				return wallIndex, "start"
+			elseif  distancebetween(love.mouse.getX(), love.mouse.getY(), wall.endX, wall.endY) < 70 then
+				--print(button.name, " button pressed")
+				return wallIndex, "end"
+			end
+
+		end
+		return 0
+	end
 
 
 
@@ -495,17 +526,7 @@ function love.update(dt)
 	end
 	FPSlogicTimer = FPSlogicTimer + dt
 
-	--node regen
-	if not editor then
-		for nodeIndex, node in ipairs(nodes) do
-			if node.team > 1 then
-				node.regenTimer = node.regenTimer - dt
-			end
-			if node.effectTimer > 0 then
-				node.effectTimer = node.effectTimer - dt
-			end
-		end
-	end
+	
 
 
 
@@ -521,106 +542,154 @@ function love.update(dt)
 
 		--print(tickCount, FPSlogicActual)
 
-		deliveryTimer = deliveryTimer - 1/FPSlogicActual
+		--pause 
+		if not pause then
 
-		for connectionIndex, connection in ipairs(connections) do
-			if connection.moving ~= true then
-				connection.sendTimer = connection.sendTimer - 1/FPSlogicActual
-			end
-		end
+			deliveryTimer = deliveryTimer - 1/FPSlogicActual
 
-		--mouse effects
-		if FPSlogicTimer > 0.1*(mouseDelayTimer%10) then
-			for timercounter = 10, 2 do
-				mousePosDelay[timercounter] = mousePosDelay[timercounter-1]
-			end
-			mousePosDelay[1] = {x = love.mouse.getX(), y = love.mouse.getY()}
-			mouseDelayTimer = mouseDelayTimer+1
-
-			for pointIndex, points in ipairs(mouseEffectPoints) do
-				points = {points.x + (mousePosDelay.x - points.x)/40 , points.y + (mousePosDelay.y - points.y)/40}
-			end
-
-		end
-
-
-		-- print(timer)
-
-		-- regen
-			-- each node's regenTimer counts down, and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
-		for nodeIndex, node in ipairs(nodes) do
-			if node.team > 1 then
-				if node.regenTimer < 0 then --regentimer updates EVERY loop not every logic update
-					if node.population < 5 then
-						node.regenTimer = nodeTiers[node.tier].regenDelay
-					else	
-						node.regenTimer = nodeTiers[node.tier].regenDelay*(2^node.tentaclesUsed)
-						--print(2^node.tentaclesUsed)
-					end
-					node.population = node.population +1
+			for connectionIndex, connection in ipairs(connections) do
+				if connection.moving ~= true then
+					connection.sendTimer = connection.sendTimer - 1/FPSlogicActual
 				end
-			else
-				--neutral occupation
-				--[[if node.population >= math.floor(node.neutralPower/3) then
-					node.team = node.neutralTeam
-				end]]
-
-
-			end
-			-- tier change
-			if node.population > nodeTiers[node.tier].max then  -- add a white growing fading circle effect from edge when tiering up or down, or sending a tentacle, team changing, recalling as cant reach
-				node.tier = node.tier + 1
-				node.effectTimer = 0.5
-				--print("Tier UP!")
-				--node
-			elseif node.population < nodeTiers[node.tier].min then
-				node.tier = node.tier -1
-				node.effectTimer = 0.5
-				--print("Tier down")
 			end
 
-			if node.population > 200 then
-				node.population = 200
-			elseif node.population < -5 then
-				node.population = 0
+			--mouse effects
+			if FPSlogicTimer > 0.1*(mouseDelayTimer%10) then
+				for timercounter = 10, 2 do
+					mousePosDelay[timercounter] = mousePosDelay[timercounter-1]
+				end
+				mousePosDelay[1] = {x = love.mouse.getX(), y = love.mouse.getY()}
+				mouseDelayTimer = mouseDelayTimer+1
+
+				for pointIndex, points in ipairs(mouseEffectPoints) do
+					points = {points.x + (mousePosDelay.x - points.x)/40 , points.y + (mousePosDelay.y - points.y)/40}
+				end
 			end
-		end
 
-		--nodeSelected = isMouseInNode()
-		if love.mouse.isDown(1) and nodeSelected > 0 and editor then
-			nodes[nodeSelected].x = love.mouse.getX()
-			nodes[nodeSelected].y = love.mouse.getY()
 
-			pointSelected = {x = 0, y = 0}
-		elseif nodeSelected == 0 then
-			--pointSelected = {x = love.mouse.getX(), y = love.mouse.getY()}
-		end
 
-		--draggin
-		--local buttonSelected = isMouseInButton()
-		if editor and love.mouse.isDown(1) and dragging then
-			--if buttonsOnScreen[buttonSelected].name == "PowerSlider" then
+			-- regen
+
+			--node regen timer countdown
+			if not editor then
+				for nodeIndex, node in ipairs(nodes) do
+					if node.team > 1 then
+						node.regenTimer = node.regenTimer - dt
+					end
+					if node.effectTimer > 0 then
+						node.effectTimer = node.effectTimer - dt
+					end
+				end
+			end
+
+
+			-- each node's regenTimer - counts down (above), and when at 0 gains 1 population. Then the Timer gets set to the regenDelay and counts down again
+			for nodeIndex, node in ipairs(nodes) do
+				if node.team > 1 then
+					if node.regenTimer < 0 then --regentimer updates EVERY loop not every logic update
+						if node.population < 5 then
+							node.regenTimer = nodeTiers[node.tier].regenDelay
+						else	
+							node.regenTimer = nodeTiers[node.tier].regenDelay*(2^node.tentaclesUsed)
+							--print(2^node.tentaclesUsed)
+						end
+						node.population = node.population +1
+					end
+				else
+					--neutral occupation
+					--[[if node.population >= math.floor(node.neutralPower/3) then
+						node.team = node.neutralTeam
+					end]]
+
+
+				end
+				-- tier change
+				if node.population > nodeTiers[node.tier].max or (node.neutralPower > nodeTiers[node.tier].max and node.team == 1) then 
+					node.tier = node.tier + 1
+					node.effectTimer = 0.5
+					--print("Tier UP!")
+					--node
+				elseif (node.population < nodeTiers[node.tier].min and node.team ~= 1) or (node.neutralPower < nodeTiers[node.tier].min and node.team == 1) then
+					node.tier = node.tier -1
+					node.effectTimer = 0.5
+					--print("Tier down")
+				end
+
+				if node.population > 200 then
+					node.population = 200
+				elseif node.population < -5 then
+					node.population = 0
+				end
+			end
+
+			-- editor moving a node
+			if love.mouse.isDown(1) and nodeSelected > 0 and editor then
+				nodes[nodeSelected].x = love.mouse.getX()
+				nodes[nodeSelected].y = love.mouse.getY()
+
+				pointSelected = {x = 0, y = 0}
+			elseif nodeSelected == 0 then
+				--pointSelected = {x = love.mouse.getX(), y = love.mouse.getY()}
+			end
+
+			--draggin
+			--local buttonSelected = isMouseInButton()
+			if editor and love.mouse.isDown(1) and dragging then
+				--if buttonsOnScreen[buttonSelected].name == "PowerSlider" then
+				
+				editPower = love.mouse.getX()-88 -- 8 offset to centre the slider itself on the mouse
+				if editPower < 0 then
+					editPower = 0
+				elseif editPower > 200 then
+					editPower = 200
+				end
+				if editorSelected.index > 0 and editorSelected.node then
+					if nodes[editorSelected.index].team > 1 then
+						nodes[editorSelected.index].population = editPower
+					else
+						nodes[editorSelected.index].neutralPower = editPower
+						if nodeTiers[nodes[editorSelected.index].tier].max < editPower then
+							nodes[editorSelected.index].tier = nodes[editorSelected.index].tier + 1
+						elseif nodeTiers[nodes[editorSelected.index].tier].min > editPower then
+							nodes[editorSelected.index].tier = nodes[editorSelected.index].tier - 1
+						end
+					end
+				end
+				--end
+			end
+
+			--editor wall moving, stops overlap from moving node and wall at once
+			if editor and love.mouse.isDown(1) and nodeSelected < 1 then
+				local wallSelected, pos = isMouseInWall()
+
+				if wallSelected > 0 then
+					if pos == "start" then
+						walls[wallSelected].startX = love.mouse.getX()
+						walls[wallSelected].startY = love.mouse.getY()
+					else
+						walls[wallSelected].endX = love.mouse.getX()
+						walls[wallSelected].endY = love.mouse.getY()
+					end
+				end
+			end
+
+
 			
-			buttonsOnScreen[4].x = love.mouse.getX()-buttonsOnScreen[4].width/2
-			if buttonsOnScreen[4].x < 50 then
-				buttonsOnScreen[4].x = 50
-			elseif buttonsOnScreen[4].x > 250 then
-				buttonsOnScreen[4].x = 250
+			-- move this to run only when a cut, node-loss, or new connection is made
+			checkOpposedConnections()
+
+			
+			updateMovingConnections() --main update processes
+
+			if AION and not editor then	--ie AI ON
+				enemyAI()
 			end
-			--end
+
+			glowDelivery()
+
+		else -- i.e. paused
+			--nothing? will unpause in the mouse pressed function
 		end
-		
-		-- move this to run only when a cut, node-loss, or new connection is made
-		checkOpposedConnections()
-
-		
-		updateMovingConnections() --main update processes
-
-		if AION then	--ie AI ON
-			enemyAI()
-		end
-
-		glowDelivery()
 
 
 		accumulator = accumulator - 1/FPSlogicTarget
@@ -1147,6 +1216,14 @@ function love.mousereleased(mouseX, mouseY)
 			end
 		end
 	end
+
+
+	-- unpause
+	if pause and isMouseInButton() == 0 then
+		pause = false
+	end
+
+
 end
 
 function cutConnection(connectionIndex, connection, ix, iy)
@@ -1207,38 +1284,81 @@ function love.mousepressed(mouseX, mouseY)
 
 	local buttonSelected = isMouseInButton()
 
-	if nodeSelected < 1 and buttonSelected < 1 then
+	local wallSelected = isMouseInWall()
+
+	if nodeSelected < 1 and buttonSelected < 1 and wallSelected < 1 then
+		--nothing selected
+
+		--point selected for making cuts
 		pointSelected = {x = mouseX, y = mouseY}
+
+		--editor create node/wall 
 		if editor then
-			--create node of type specified 
-			table.insert(nodes, {x = mouseX,
-				y = mouseY,
-				team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-				population = 50,
-				tier = 3,
-				regenTimer = 5,
-				tentaclesUsed = 0,
-				effectTimer = 0, 
-				neutralPower = 30,
-				neutralTeam = 1 
-				})
-			pointSelected = {x = 0, y = 0}
-			nodeSelected = isMouseInNode()
+			if createMicrobe then
+				--create node of type specified 
+				if editTeam > 1 then
+					table.insert(nodes, {x = mouseX,
+						y = mouseY,
+						team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+						population = editPower,
+						tier = 3,
+						regenTimer = 5,
+						tentaclesUsed = 0,
+						effectTimer = 0, 
+						neutralPower = 30,
+						neutralTeam = 1 
+						})
+				else
+					table.insert(nodes, {x = mouseX,
+						y = mouseY,
+						team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+						population = 0,
+						tier = 3,
+						regenTimer = 5,
+						tentaclesUsed = 0,
+						effectTimer = 0, 
+						neutralPower = math.floor(editPower),
+						neutralTeam = 1 
+						})
+				end
+				pointSelected = {x = 0, y = 0}
+				nodeSelected = isMouseInNode()
+				editorSelected.node = true
+				editorSelected.index = #nodes
+			else
+				--create wall
+				table.insert(walls, {
+					startX = mouseX,
+		    		startY = mouseY, --lower
+		    		endX = (arenaWidth/2+ 1.5*mouseX)/2.5,
+		    		endY = (arenaHeight/2+ 1.5*mouseY)/2.5
+		    	})
+		    	editorSelected.node = false
+				editorSelected.index = #walls
+			end
 
 		end
-	elseif nodeSelected > 0 and buttonSelected < 1 then
+	elseif nodeSelected > 0 and buttonSelected < 1 and wallSelected < 1 then
+		--node selected
 		pointSelected = {x = 0, y = 0}
 
 		if editor then
-			nodes[nodeSelected].x = mouseX
-			nodes[nodeSelected].y = mouseY
+			editorSelected.node = true
+			editorSelected.index = nodeSelected
+			editPower = nodes[nodeSelected].population
+			editTeam = nodes[nodeSelected].team
 		end
+	elseif nodeSelected < 1 and buttonSelected < 1 and wallSelected > 0 and editor then
+		--wall selected
+		editorSelected.node = false
+		editorSelected.index = wallSelected
 	end
 
 	
 
 	--menu interactions
 	if buttonSelected > 0 then
+		pointSelected = {x = 0, y = 0}
 		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
 			connections = {}
 			nodeDistances = {}
@@ -1257,6 +1377,7 @@ function love.mousepressed(mouseX, mouseY)
 			end	
 
 		elseif buttonsOnScreen[buttonSelected].name == "Menu" then
+			menuWigglerSeed = createSeed()
 			currentLevel = 0
 			editor = false
 			print("EDITOR MODE OFF")
@@ -1288,6 +1409,10 @@ function love.mousepressed(mouseX, mouseY)
 			nodes = levelNodesTable[currentLevel] 
 
 			calculateNodeDistances() 
+
+		elseif buttonsOnScreen[buttonSelected].name == "Pause" then
+			pause = true
+
 
 		elseif buttonsOnScreen[buttonSelected].name == "Unlock" then
 			for level, progressNumber in ipairs(levelProgress) do
@@ -1332,15 +1457,34 @@ function love.mousepressed(mouseX, mouseY)
 
 		elseif buttonsOnScreen[buttonSelected].name == "Create Microbe" then
 			createMicrobe = true
-			buttonsOnScreen = editorButtons
+			table.remove(buttonsOnScreen, #buttonsOnScreen-1)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
 		elseif buttonsOnScreen[buttonSelected].name == "Create Wall" then
 			createMicrobe = false
-			buttonsOnScreen = editorButtons
+			table.remove(buttonsOnScreen, #buttonsOnScreen-1)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
 		elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
 			dragging = true
-			buttonsOnScreen[buttonSelected].x = love.mouse.getX()
-
-
+			
+		elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
+			table.insert(buttonsOnScreen, allButtons[17])
+			table.insert(buttonsOnScreen, allButtons[18])
+			table.insert(buttonsOnScreen, allButtons[19])
+		elseif buttonsOnScreen[buttonSelected].name == "Green" then
+			editTeam = 2
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+		elseif buttonsOnScreen[buttonSelected].name == "Red" then
+			editTeam = 3
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+		elseif buttonsOnScreen[buttonSelected].name == "Neutral" then
+			editTeam = 1
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			table.remove(buttonsOnScreen, #buttonsOnScreen)
 		else
 
 
@@ -1510,6 +1654,16 @@ function calculateNodeDistances()
 
 end
 
+function createSeed()
+	-- 1 - 9 random numbers
+
+	local seed = {}
+	for r = 1, 20 do
+		table.insert(seed, math.floor(math.random(1,9.9999 )))
+	end
+	return seed
+
+end
 
 function mouseEffect()
 
@@ -1526,7 +1680,7 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setColor(1,1,1,1)
 	love.graphics.draw(current_background)
 
-	
+	love.graphics.setLineWidth(2)
 
 	--grey control bar at the bottom
 	if current_background == game_background then
@@ -1571,13 +1725,94 @@ function love.draw(mouseX, mouseY)
 			love.graphics.line(arenaWidth/2+180*(math.sin(2*math.pi*i/20)),   arenaHeight/2+50-180*(math.cos(2*math.pi*i/20)), 
 				arenaWidth/2+ ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.sin(2*math.pi*i/20)),    arenaHeight/2+50- ((math.ceil((levelProgress[i+1]/3)%1))*60 + 235)*(math.cos(2*math.pi*i/20)) )
 		end
+
+		love.graphics.setFont(font14)
+		--menu wigglers
+		love.graphics.setLineWidth(1)
+
+		local menuWigglerX, menuWigglerY = arenaWidth/2+180*(math.sin(2*math.pi*0)),   arenaHeight/2+50-180*(math.cos(2*math.pi*0))
+
+		love.graphics.translate(arenaWidth/2,arenaHeight/2+50)
+		love.graphics.rotate(math.pi/20) --half turn so that wigglers are not on level lines
+		love.graphics.translate(-arenaWidth/2, -(arenaHeight/2+50))
+
+		for seedIndex, number in ipairs(menuWigglerSeed) do
+			love.graphics.setColor(1,1,1)
+			--if seedIndex == 2 then
+				--love.graphics.setColor(1,0,0)
+			--end
+
+			--1-3 = short, 4-6 = medium, 7-9 = long
+			--1,4,7 = no bobble.  2,5,8 = grey bobble.   3,6,9 = black bobble.
+			-- length ciel( number /3 ) == 1,2,3 = s,m,l
+			-- bobble number%3 = 1,2,0 = /,g,b
+
+
+			--local menuWigglerX, menuWigglerY = arenaWidth/2+180*(math.sin(2*math.pi*(seedIndex+0.5)/20)),   arenaHeight/2+50-180*(math.cos(2*math.pi*(seedIndex+0.5)/20))
+
+			--love.graphics.print(seedIndex,menuWigglerX, menuWigglerY)
+			love.graphics.line(
+				menuWigglerX, 
+				menuWigglerY,
+				menuWigglerX + (((math.sin(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%1.6)*1.25*math.pi)*7))*(math.ceil(number/3)/30+0.2)), 
+				menuWigglerY-(6+ 4*math.ceil(number/3)) - (((math.cos(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%0.8)*2.25*math.pi)*0.8))*1),
+				menuWigglerX + (((math.sin(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%1.6)*1.25*math.pi)*7))*(math.ceil(number/3)/12+0.4)), 
+				menuWigglerY-(8+ 7*math.ceil(number/3)) - (((math.cos(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%0.8)*2.25*math.pi)*0.8))*1),
+				menuWigglerX + (((math.sin(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%1.6)*1.25*math.pi)*7))*(math.ceil(number/3)/6+0.8)), 
+				menuWigglerY-(10+ 10*math.ceil(number/3))  -(((math.cos(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%0.8)*2.25*math.pi)*0.8))*1))
+			--bobbles
+			if number % 3 ~= 1 then
+				if number % 3 == 2 then
+					--grey
+					love.graphics.setColor(teamColours[1])
+				else
+					--black
+					love.graphics.setColor(0,0,0)
+				end
+				love.graphics.circle('fill',
+					menuWigglerX + (((math.sin(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%1.6)*1.25*math.pi)*7))*(math.ceil(number/3)/6+0.8)), 
+				menuWigglerY-(10+ 10*math.ceil(number/3)) - (((math.cos(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%0.8)*2.25*math.pi)*0.8))*1),   6)
+
+				--border
+				love.graphics.setColor(1,1,1)
+				love.graphics.circle('line',
+					menuWigglerX + (((math.sin(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%1.6)*1.25*math.pi)*7))*(math.ceil(number/3)/6+0.8)), 
+				menuWigglerY-(10+ 10*math.ceil(number/3)) - (((math.cos(((timer+(seedIndex*number/2.5)+seedIndex/1.9)%0.8)*2.25*math.pi)*0.8))*1),   6)
+
+			end
+
+
+
+			--[[for looper = 1, 20 do
+				love.graphics.points(
+					50+menuWigglerX + 5*(((math.sin(((timer+(looper*number/2.5)+looper/1.9)%1.6)*1.25*math.pi)*6))*1), 
+					50+menuWigglerY-14-10*(((math.cos(((timer+(looper*number/2.5)+looper/1.9)%0.8)*2.25*math.pi)*0.8))*1))
+			end]]
+					
+
+
+			--[[love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - InnerWobblerRadius,
+							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius)
+					]]
+
+			--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
+			love.graphics.translate(arenaWidth/2,arenaHeight/2+50)
+			love.graphics.rotate(math.pi/10)
+			love.graphics.translate(-arenaWidth/2, -(arenaHeight/2+50))
+
+		end
+
+		love.graphics.origin()
 	end
 
 	love.graphics.setFont(font14)
 
 	--draw buttons
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
-		love.graphics.setColor(0.5,0,0.5)
+		love.graphics.setColor(0.3,0.3,0.3)
 		if button.name == "God" then
 			if godModeON then
 				love.graphics.setColor(0,0.5,0)
@@ -1605,6 +1840,18 @@ function love.draw(mouseX, mouseY)
 				else
 					love.graphics.print("Create Wall",button.x,button.y)
 				end
+
+			elseif button.name == "MicrobeTeam" then
+				if editTeam == 1 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Neutral",button.x,button.y)
+				elseif editTeam == 2 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Green",button.x,button.y)
+				elseif editTeam == 3 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Red",button.x,button.y)
+				end
+
+			elseif button.name == "PowerSlider" then
+				love.graphics.rectangle('fill',editPower+80,button.y-2,16, button.height-4,button.height/5,button.height/5)
 			else
 				love.graphics.print(button.name,button.x,button.y)
 			end
@@ -1615,22 +1862,37 @@ function love.draw(mouseX, mouseY)
 
 				love.graphics.setColor(teamColours[levelProgress[button.name]])
 				love.graphics.circle('fill',button.x,button.y,button.height)
-				love.graphics.setColor(1,1,1,1)
+				love.graphics.setColor(1,1,1)
 				love.graphics.setFont(nodefont38)
 				love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
 				love.graphics.setFont(font14)
 				teamColours[levelProgress[button.name]][4] = 1
 
 				
-			--[[elseif currentLevel > 0 then
-				--control bar buttons
-				love.graphics.setColor(1,1,1)
-				love.graphics.circle('line',button.x,button.y,button.height)]]
+	
+			end
+
+			--black interior before image
+			if button.name == "Menu" or button.name == "Mute" or button.name == "Pause" or button.name == "Reset" then
+				love.graphics.setColor(0,0,0)
+				love.graphics.circle('fill',button.x,button.y,button.height)
+			end
+
+			love.graphics.setColor(1,1,1)
+			if button.name == "Menu" then
+				love.graphics.draw(image_QuitMenuButton, button.x-button.width+8, button.y-button.width+8 ,0,0.8,0.8)
+			elseif button.name == "Mute" then
+				love.graphics.draw(image_MuteButton, button.x-button.width+5, button.y-button.width+5 ,0,0.8,0.8)
+			elseif button.name == "Pause" then
+				love.graphics.draw(image_PauseButton, button.x-button.width+8, button.y-button.width+7 ,0,0.8,0.8)
+			elseif button.name == "Reset" then
+				love.graphics.draw(image_ResetButton, button.x-button.width+3, button.y-button.width+4 ,0,0.8,0.8)
 			end
 
 			--border
 			love.graphics.setColor(1,1,1)
 			love.graphics.circle('line',button.x,button.y,button.height)
+
 
 		end
 	end
@@ -1638,11 +1900,11 @@ function love.draw(mouseX, mouseY)
 
 	
 	love.graphics.setColor(1,1,1,1)
-	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 10)
+	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 60)
 
-	love.graphics.print("Logic updates per second: "..FPSlogicActual.."/"..FPSlogicTarget, 120, 10)
+	love.graphics.print("Logic updates per second: "..FPSlogicActual.."/"..FPSlogicTarget, 120, 60)
 
-	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 10)
+	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 60)
 
 	--draw total power ratio bar
 	local totalTeamPowers = {0,0,0}
@@ -1668,13 +1930,8 @@ function love.draw(mouseX, mouseY)
 	end
 
 
-
-
-	mouseEffect()
-
-
 	--highlight
-	if not editor then
+	if editor == false then
 		local highlightedNode = isMouseInNode()
 		if highlightedNode > 0 then
 			love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
@@ -1683,6 +1940,14 @@ function love.draw(mouseX, mouseY)
 	--[[elseif nodeSelected > 0 then
 		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
 		love.graphics.circle('fill', nodes[nodeSelected].x, nodes[nodeSelected].y, nodeTiers[nodes[highlightedNode].tier].radius)]]
+	else
+		if editorSelected.index > 0 then
+			if editorSelected.node and #nodes > 0 then --node
+				love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+				love.graphics.circle('fill', nodes[editorSelected.index].x, nodes[editorSelected.index].y, nodeTiers[nodes[editorSelected.index].tier].radius+2)
+			end
+			--wall highlight is done on wall creation as the shape is too complicated to redo again here
+		end
 	end
 
 	local highlightedButton = isMouseInButton()
@@ -1697,6 +1962,11 @@ function love.draw(mouseX, mouseY)
 	else
 		love.mouse.setCursor()
 	end
+
+
+	mouseEffect()
+
+
 
 	-- node ping affect on change
 	-- effect timer counts down to 0 as the circle's radius increases and the circle fades out
@@ -1959,11 +2229,11 @@ function love.draw(mouseX, mouseY)
 										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
 
 									--testing points
-									for a = 1, 24 do
+									--for a = 1, 24 do
 										--love.graphics.points(node.x-(math.sin(((a)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
 										--node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8)
 										--love.graphics.circle('line',node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-5, 5)
-									end
+									--end
 
 									--rotate the whole screen centred on the wobbler
 									love.graphics.translate(node.x, node.y-nodeTiers[node.tier].radius)
@@ -2082,10 +2352,16 @@ function love.draw(mouseX, mouseY)
 
 	-- draw all walls
 	for wallIndex, wall in ipairs(walls) do
-		
-		--love.graphics.line(wall.startX, wall.startY,wall.endX, wall.endY)
-		--love.graphics.polygon('fill', wall.startX, wall.startY-20, 20,20, wall.endX, wall.endY+50)
-		--print("WALL", wallIndex)  (wall.startX+wall.endX)/2, (wall.startY+wall.endY)/2
+
+		--draw wall grip points editor guide
+		if editor then
+
+			for g = 1, 20 do
+				love.graphics.points(wall.startX+math.sin(g/10*math.pi)*70, wall.startY+math.cos(g/10*math.pi)*70)
+				love.graphics.points(wall.endX+math.sin(g/10*math.pi)*70, wall.endY+math.cos(g/10*math.pi)*70)
+			end
+		end
+
 
 		local angle = calculateSourceYAngleAny({x = wall.endX, y = wall.endY}, {x = wall.startX, y = wall.startY} )
 			
@@ -2093,21 +2369,6 @@ function love.draw(mouseX, mouseY)
 		love.graphics.translate(wall.startX, wall.startY)
 		love.graphics.rotate(-angle)
 		local distanceDiff = -distancebetween(wall.endX, wall.endY, wall.startX, wall.startY)
-
-		--love.graphics.line(0, 10,4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2,4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2,0,-10)
-		--love.graphics.line(distanceDiff, 10,distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, 2, distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, -2, distanceDiff, -10)
-				 
-		--[[love.graphics.line(0,10, 
-			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
-			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
-			distanceDiff/1.1 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
-			distanceDiff, 10)
-
-		--love.graphics.line(0,-10, 
-			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
-			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
-			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
-			distanceDiff, -10)]]
 
 		local wallPoints = {
 
@@ -2129,18 +2390,29 @@ function love.draw(mouseX, mouseY)
 			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
 			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
 			0,-10
-
-			
-			
-		
 		}
 
+
+		--wall highlight when using editor
+		if editor and editorSelected.node == false and editorSelected.index == wallIndex then
+			for w = 3, 1, -1 do
+				love.graphics.setColor(0.9, 0.9, 0.2, w/9)
+				love.graphics.setLineWidth( 16/w )
+				love.graphics.polygon('line', wallPoints)
+				--print("wall highlight")
+			end
+		end
+
+
+		--draw wall
 		love.graphics.setLineWidth( 2 )
 		love.graphics.setColor(0.3,0.3,0.1)
 		love.graphics.polygon('fill', wallPoints)
 		--border
 		love.graphics.setColor(1,1,1)
 		love.graphics.polygon('line', wallPoints)
+
+
 
 
 
@@ -2153,6 +2425,8 @@ function love.draw(mouseX, mouseY)
 		love.graphics.origin()
 	end
 	
+
+
 
 	
 	-- draw line between mouse and NODE after node selected, before release
@@ -2187,8 +2461,9 @@ function love.draw(mouseX, mouseY)
 				--love.graphics.line(500,0,500,500)
 
 			elseif (editor == false) and nodeSelected == 0 and pointSelected.x ~= 0 then --shouldnt need not editor again
+				-- red line
 				love.graphics.setColor(0.8, 0, 0)
-				print(pointSelected.x,pointSelected.y)
+				--print(pointSelected.x,pointSelected.y)
 				love.graphics.line(pointSelected.x, pointSelected.y, love.mouse.getX(), love.mouse.getY()) 
 				--get angle of red line
 				--print(calculateSourceYAngleAny({x = pointSelected.x, y = pointSelected.y}, {x = love.mouse.getX(), y = love.mouse.getY()}))
@@ -2276,4 +2551,24 @@ function love.draw(mouseX, mouseY)
 		end
 	end
 
+	--pause goes on top of everything
+	if pause then
+		--darken everything
+		love.graphics.setColor(0, 0, 0, 0.7)
+		love.graphics.rectangle('fill', 0,0, arenaWidth, arenaHeight)
+		
+		-- pause title
+		love.graphics.setFont(titlefont)
+		--black outline:
+		love.graphics.setColor(0,0,0)
+		love.graphics.printf("Paused", 0-5, arenaHeight/2-80, arenaWidth , 'center')
+		love.graphics.printf("Paused", 0+5, arenaHeight/2-80, arenaWidth , 'center')
+		love.graphics.printf("Paused", 0, arenaHeight/2+5-80, arenaWidth , 'center')
+		love.graphics.printf("Paused", 0, arenaHeight/2-5-80, arenaWidth , 'center')
+
+
+		--title in white
+		love.graphics.setColor(1,1,1,0.7)
+		love.graphics.printf("Paused", 0, arenaHeight/2-80, arenaWidth , 'center')
+	end
 end
