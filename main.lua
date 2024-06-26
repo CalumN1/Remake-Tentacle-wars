@@ -40,7 +40,7 @@ function love.load()
 
 	editPower = 10
 	editTeam = 2
-	editorSelected = {node = true, index = 1}
+	editorSelected = {node = true, index = 0}
 
 	menuWigglerSeed = {}
 
@@ -84,7 +84,7 @@ function love.load()
 	tickPeriod = 1/50 -- seconds per tick
 	accumulator = 0.0
 
-	editorNodes = {
+	nodes = {
 		{
 			x = 50,
 			y = 150,
@@ -160,7 +160,16 @@ function love.load()
 		},
 	}
 
-	nodes = editorNodes
+	--[[nodes = {}
+	for nodeIndex, node in ipairs(editorNodes) do 
+		table.insert(nodes, node) 
+	end]]
+	editorSaveState = {
+		--{
+			--team, population, ?
+		--}
+
+	}
 
 	walls = {
 		{
@@ -258,7 +267,7 @@ function love.load()
 		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
 		{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
 		{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
-		{name = "Editor", x=arenaWidth/2,y=arenaHeight/2, width=80, height=30, shape = "rectangle"}, 
+		{name = "Editor", x=arenaWidth/2-60,y=arenaHeight/2, width=130, height=33, shape = "text"}, 
 		--10 vv
 		{name = "CreateX", x=2,y=2, width=256, height=60, shape = "rectangle"}, 
 		{name = "MicrobeTeam", x=80,y=170, width=200, height=30, shape = "rectangle"}, 
@@ -319,7 +328,7 @@ function love.load()
 	function isMouseInButton()
 		
 		for buttonIndex, button in ipairs(buttonsOnScreen) do
-			if button.shape == "rectangle" then
+			if button.shape == "rectangle" or button.shape == "text" then
 				if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width/2 and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height/2 then
 					--print(button.name, " button pressed")
 					return buttonIndex
@@ -543,12 +552,12 @@ function love.update(dt)
 		--print(tickCount, FPSlogicActual)
 
 		--pause 
-		if not pause then
+		if not pause and (#nodes > 0 or #walls > 0) then
 
 			deliveryTimer = deliveryTimer - 1/FPSlogicActual
 
 			for connectionIndex, connection in ipairs(connections) do
-				if connection.moving ~= true then
+				if connection.moving == false and nodes[connection.source].population > 4 then
 					connection.sendTimer = connection.sendTimer - 1/FPSlogicActual
 				end
 			end
@@ -673,7 +682,7 @@ function love.update(dt)
 				end
 			end
 
-
+			
 			
 			-- move this to run only when a cut, node-loss, or new connection is made
 			checkOpposedConnections()
@@ -1037,7 +1046,7 @@ function checkOpposedConnections()
 
 					connection1.opposedConnectionIndex= connectionIndex2
 					connection2.opposedConnectionIndex= connectionIndex1
-					print("OPPOSED!", connection1.opposedConnectionIndex, " - ", connection2.opposedConnectionIndex)
+					print("OPPOSED! node,team - node,team",connection[connection1.opposedConnectionIndex].source, connection[connection1.opposedConnectionIndex].team, " - ", connection[connection2.opposedConnectionIndex].source, connection[connection2.opposedConnectionIndex].team)
 
 					connection1.destination = 1
 					connection2.destination = 1
@@ -1317,7 +1326,7 @@ function love.mousepressed(mouseX, mouseY)
 						regenTimer = 5,
 						tentaclesUsed = 0,
 						effectTimer = 0, 
-						neutralPower = math.floor(editPower),
+						neutralPower = editPower,
 						neutralTeam = 1 
 						})
 				end
@@ -1345,7 +1354,11 @@ function love.mousepressed(mouseX, mouseY)
 		if editor then
 			editorSelected.node = true
 			editorSelected.index = nodeSelected
-			editPower = nodes[nodeSelected].population
+			if nodes[nodeSelected].team ~= 1 then
+				editPower = nodes[nodeSelected].population
+			else
+				editPower = nodes[nodeSelected].neutralPower
+			end
 			editTeam = nodes[nodeSelected].team
 		end
 	elseif nodeSelected < 1 and buttonSelected < 1 and wallSelected > 0 and editor then
@@ -1354,14 +1367,15 @@ function love.mousepressed(mouseX, mouseY)
 		editorSelected.index = wallSelected
 	end
 
-	
+	--[[if #editorSaveState > 0 then
+		print(editorSaveState[1].population)
+	end]]
 
 	--menu interactions
 	if buttonSelected > 0 then
 		pointSelected = {x = 0, y = 0}
 		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
 			connections = {}
-			nodeDistances = {}
 			levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
 			currentLevel = buttonsOnScreen[buttonSelected].name
 			current_background = game_background
@@ -1403,12 +1417,15 @@ function love.mousepressed(mouseX, mouseY)
 			menuButtons[#menuButtons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
 			menuButtons[#menuButtons-20+currentLevel+1].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(currentLevel)/20))
 		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
-			connections = {}
-			nodeDistances = {}
-			levelNodesTable = levelNodes(arenaWidth,arenaHeight)
-			nodes = levelNodesTable[currentLevel] 
+			if not editor then
+				connections = {}
+				levelNodesTable = levelNodes(arenaWidth,arenaHeight)
+				nodes = levelNodesTable[currentLevel] 
+			else
 
-			calculateNodeDistances() 
+			end
+
+			calculateNodeDistances() -- necessary?
 
 		elseif buttonsOnScreen[buttonSelected].name == "Pause" then
 			pause = true
@@ -1437,54 +1454,142 @@ function love.mousepressed(mouseX, mouseY)
 			end	]]
 
 		elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
+			calculateNodeDistances() 
+
 			connections = {}
-			editor = not editor
-			if editor then
-				nodes = editorNodes 
+			editor = not editor --switch editor mode
+			--check what editor state we've just moved to
+			if editor then	-- also set occupied number for neutral nodes
+				--print ("enode1 pop: ", editorSaveState[1].population)
+				
+				for nodeIndex, node in ipairs(nodes) do 
+					node.team = editorSaveState[nodeIndex].team
+					node.population = editorSaveState[nodeIndex].population
+					node.tentaclesUsed = 0
+				end
+				--print ("enode1 pop: ", editorSaveState[1].population)
+				--nodes = editorNodes 
+				--editorNodes is the save state to revert nodes to when leaving testing
 
 				buttonsOnScreen = editorButtons
-			else
-				editorNodes = nodes
+			else --i.e. now in testing
+				--print ("enode1 pop: ", editorSaveState[1].population)
+				editorSaveState = {}
+				for nodeIndex, node in ipairs(nodes) do 
+					table.insert(editorSaveState, {team = node.team, population = node.population}) 
+				end
+				--print ("saved - enode1 pop: ", editorSaveState[1].population)
+				--editorNodes = nodes --set save state to current setup
 
 				buttonsOnScreen = controlBarButtons
 				table.insert(buttonsOnScreen, allButtons[14])
+
+				
 			end
 			
-		elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
+			print("TESTING, Testing the edit")
 
-			table.insert(buttonsOnScreen, allButtons[15])
-			table.insert(buttonsOnScreen, allButtons[16])
+		elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
+			local existsAlready = false
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+					table.remove(buttonsOnScreen, b)
+					existsAlready = true
+				end
+			end
+			if existsAlready == false then
+				table.insert(buttonsOnScreen, allButtons[15])
+				table.insert(buttonsOnScreen, allButtons[16])
+			end
 
 		elseif buttonsOnScreen[buttonSelected].name == "Create Microbe" then
 			createMicrobe = true
-			table.remove(buttonsOnScreen, #buttonsOnScreen-1)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+					table.remove(buttonsOnScreen, b)
+				end
+			end
+
 		elseif buttonsOnScreen[buttonSelected].name == "Create Wall" then
 			createMicrobe = false
-			table.remove(buttonsOnScreen, #buttonsOnScreen-1)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+					table.remove(buttonsOnScreen, b)
+				end
+			end
+
 		elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
 			dragging = true
 			
 		elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
-			table.insert(buttonsOnScreen, allButtons[17])
-			table.insert(buttonsOnScreen, allButtons[18])
-			table.insert(buttonsOnScreen, allButtons[19])
+			local existsAlready = false
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					table.remove(buttonsOnScreen, b)
+					existsAlready = true
+				end
+			end
+
+			if existsAlready == false then
+				table.insert(buttonsOnScreen, allButtons[17])
+				table.insert(buttonsOnScreen, allButtons[18])
+				table.insert(buttonsOnScreen, allButtons[19])
+			end
+
 		elseif buttonsOnScreen[buttonSelected].name == "Green" then
 			editTeam = 2
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					table.remove(buttonsOnScreen, b)
+				end
+			end
+
+			if editorSelected.node and #nodes > 0 then
+				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+					nodes[editorSelected.index].population = editPower
+				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+					nodes[editorSelected.index].population = 0
+					nodes[editorSelected.index].neutralPower = editPower
+				end
+
+				nodes[editorSelected.index].team = editTeam
+			end
+
 		elseif buttonsOnScreen[buttonSelected].name == "Red" then
 			editTeam = 3
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					table.remove(buttonsOnScreen, b)
+				end
+			end
+			if editorSelected.node and #nodes > 0 then
+				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+					nodes[editorSelected.index].population = editPower
+				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+					nodes[editorSelected.index].population = 0
+					nodes[editorSelected.index].neutralPower = editPower
+				end
+
+				nodes[editorSelected.index].team = editTeam
+			end
+
 		elseif buttonsOnScreen[buttonSelected].name == "Neutral" then
 			editTeam = 1
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
-			table.remove(buttonsOnScreen, #buttonsOnScreen)
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					table.remove(buttonsOnScreen, b)
+				end
+			end
+			if editorSelected.node and #nodes > 0 then
+				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+					nodes[editorSelected.index].population = editPower
+				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+					nodes[editorSelected.index].population = 0
+					nodes[editorSelected.index].neutralPower = editPower
+				end
+
+				nodes[editorSelected.index].team = editTeam
+			end
 		else
 
 
@@ -1497,7 +1602,7 @@ end
 
 function enemyAI()
 
-	--wait 5 seconds before starting
+	--wait 5 seconds before starting    -?
 
 	-- attack closest node if it has at least half the targets population
 
@@ -1511,7 +1616,7 @@ function enemyAI()
 
 	--further and max 40, 40vs40 no send, responds 
 
-	-- 40 vs 10 close, sends at  20, opposes at 16, halfway =3/4
+	-- 40 vs 10 close, sends at  20, opposes at 16, halfway =3or4
 	--10v10 max 20 never sends
 	-- close, 20vs20, sends at 22, opposes straight away 20, halfway =3/4
 	--close 10vs10, sends at  21, opposes at 16
@@ -1519,7 +1624,7 @@ function enemyAI()
 	--close 90vs20, sends at 22 aka 5 seconds, 
 	--close 200vs10, sends at 21, halfway 2/3
 
-	--far 200vs20, sends at 50, distance 32, opposses at 29
+	--far 200vs20, sends at 50, distance 32, opposes at 29
 	--slightly less far, sends at 45, distance 28 
 
 	-- 17 + distance?
@@ -1541,57 +1646,69 @@ function enemyAI()
 	-- NEW: table [1] is the distances from node 1 in order of distance, {distance, targetNode}. so when AI is looking at node 1's options look at if the distance: nodeDistances[1][1][2] is acceptable then create connection to node: nodeDistances[1][1][1]
 	-- nodeDistances[1][1][2] means nodeDistances[the source node = 1] [1 = check the closest node] [2 = the distance]
 	-- and nodeDistances[#nodeDistances] [#nodeDistances[1]] [1] means nodeDistances[the last node] [the furtherest away node from it] [that node's index]
-	-- unreachable nodes including the node itself are simply not included here and thereffor never considered as a target
+	-- unreachable nodes including the node itself are simply not included here and therefor never considered as a target
+
+	--print()
+	--print("Check nodeDistances:")
+	--print(#nodeDistances)
+	--for c = 1, #nodeDistances do 
+	--	print(#nodeDistances[c])
+	--end
 
 
 	for nodeIndex, node in ipairs(nodes) do
-		if nodeIndex ~= 9 then
+		if nodeIndex ~= 9 then	--waht? why?
 			--only act for enemy nodes
 			if node.team > 2 then 
 				--only consider creating new tentacles for nodes with spare tentacles
 				if node.tentaclesUsed < nodeTiers[node.tier].maxTentacles then
 					--loop through each potential target node from closest to furthest away
-					for i = 1, #nodeDistances[nodeIndex] do
-						--print("looping: ", nodeIndex, i)
-						local targetNodeAndDistance = nodeDistances[nodeIndex][i]
-						--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
-						-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
-						--print(targetNodeAndDistance[1])
-						--print(nodes[targetNodeAndDistance[1]].team)
+					if #nodeDistances[nodeIndex] > 0 then
+						for i = 1, #nodeDistances[nodeIndex] do
+							--print("looping: ", nodeIndex, i)
+							local targetNodeAndDistance = nodeDistances[nodeIndex][i]
+							--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
+							-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
+							--print(targetNodeAndDistance[1])
+							--print(nodes[targetNodeAndDistance[1]].team)
 
-						if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
-							(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population+15 < node.population ) then    -- adjust the +10, what population gap determines when purple helps an ally?
+							--issue here ######## - the code errors here, attempted to index a nil value or something
 
-							-- check for duplicate connection
-							local connectionAlreadyExists = false
-							for connectionIndex, connection in ipairs(connections) do
-								if connection.source == nodeIndex and connection.target == targetNodeAndDistance[1] then 
-									connectionAlreadyExists = true
-									--print("ignored duplicate: ", connection.source, " -> ", connection.target)
+
+							if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
+								(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population < node.population -30 ) then    -- adjust the +10, what population gap determines when purple helps an ally?
+
+								-- check for duplicate connection
+								local connectionAlreadyExists = false
+								for connectionIndex, connection in ipairs(connections) do
+									if connection.source == nodeIndex and connection.target == targetNodeAndDistance[1] then 
+										connectionAlreadyExists = true
+										--print("ignored duplicate: ", connection.source, " -> ", connection.target)
+									end
+
 								end
 
-							end
 
 
-
-							-- check for wall intersection
-							local wallIntersection = false
-							for wallIndex, wall in ipairs(walls) do 
-								ix, iy = findIntersectionPoint(nodes[nodeIndex].x, nodes[nodeIndex].y, nodes[targetNodeAndDistance[1]].x, nodes[targetNodeAndDistance[1]].y, wall.startX, wall.startY, wall.endX, wall.endY)
-								if ix ~= nil and iy ~= nil then -- intersection exists
-									wallIntersection = true
+								-- check for wall intersection
+								local wallIntersection = false
+								for wallIndex, wall in ipairs(walls) do 
+									ix, iy = findIntersectionPoint(nodes[nodeIndex].x, nodes[nodeIndex].y, nodes[targetNodeAndDistance[1]].x, nodes[targetNodeAndDistance[1]].y, wall.startX, wall.startY, wall.endX, wall.endY)
+									if ix ~= nil and iy ~= nil then -- intersection exists
+										wallIntersection = true
+									end
 								end
-							end
 
 
 
-							if wallIntersection == false and connectionAlreadyExists == false then
+								if wallIntersection == false and connectionAlreadyExists == false then
 
-								--create connection
-								--print(targetNodeAndDistance[1])
-								createConnection(nodeIndex, targetNodeAndDistance[1])
-								--print("break!")
-								break
+									--create connection
+									--print(targetNodeAndDistance[1])
+									createConnection(nodeIndex, targetNodeAndDistance[1])
+									--print("break!")
+									break
+								end
 							end
 						end
 					end
@@ -1604,7 +1721,7 @@ function enemyAI()
 
 						--if same team 
 						-- numbers should work for 200 vs 20 =stay, and 200 vs 140 = stay?, 20 vs 10=cut, 10 vs 20=cut, 50 vs 20=cut?
-						if node.team == nodes[connection.target].team   and   0.8*node.population + 30 < nodes[connection.target].population + 15*nodes[connection.target].tentaclesUsed then
+						if node.team == nodes[connection.target].team   and   node.population + 30  < nodes[connection.target].population then
 
 							--if nodes[connection.target].population+30 > node.population
 
@@ -1626,18 +1743,23 @@ end
 function calculateNodeDistances()
 
 	--works out the distances between all nodes and saves them to avoid being recalculated in future  sorted in order of closest to smallest { nodeIndex, dist}
+	nodeDistances = {}
 	for nodeIndex1, node1 in ipairs(nodes) do
 		local eachNodesDistances = {}
 		for nodeIndex2, node2 in ipairs(nodes) do
 			if nodeIndex1 ~= nodeIndex2 then
 				--check for walls and ignore distance if blocked
-				for wallIndex, wall in ipairs(walls) do
-					ix, iy = findIntersectionPoint(wall.startX, wall.startY, wall.endX, wall.endY, node1.x, node1.y, node2.x, node2.y)
-					if ix == nil and iy == nil then
-						table.insert(eachNodesDistances, {nodeIndex2, distancebetween(node1.x, node1.y, node2.x, node2.y)})
-					else
-						--print("wall", nodeIndex1, " ", nodeIndex2)
+				if #walls > 0 then
+					for wallIndex, wall in ipairs(walls) do
+						ix, iy = findIntersectionPoint(wall.startX, wall.startY, wall.endX, wall.endY, node1.x, node1.y, node2.x, node2.y)
+						if ix == nil and iy == nil then
+							table.insert(eachNodesDistances, {nodeIndex2, distancebetween(node1.x, node1.y, node2.x, node2.y)})
+						else
+							--print("wall", nodeIndex1, " ", nodeIndex2)
+						end
 					end
+				else
+					table.insert(eachNodesDistances, {nodeIndex2, distancebetween(node1.x, node1.y, node2.x, node2.y)})
 				end
 			end
 		end
@@ -1645,11 +1767,20 @@ function calculateNodeDistances()
 		for distanceIndex1, distance1 in ipairs(eachNodesDistances) do
 			for distanceIndex2, distance2 in ipairs(eachNodesDistances) do
 				if distanceIndex1 ~= distanceIndex2 and distance1[2] > distance2[2] then
-					eachNodesDistances[distanceIndex1], eachNodesDistances[distanceIndex2] = eachNodesDistances[distanceIndex2], eachNodesDistances[distanceIndex1]
+					eachNodesDistances[distanceIndex1], eachNodesDistances[distanceIndex2] = eachNodesDistances[distanceIndex2], eachNodesDistances[distanceIndex1] --swap places
 				end
 			end
 		end
 		table.insert(nodeDistances, eachNodesDistances)
+	end
+
+	print( "  __________  ")
+	print(#nodeDistances, " - top parent, number of node distances")
+	for ndIndex, nd in ipairs(nodeDistances) do
+		print(#nd, " - number in this bracket")
+		for xIndex, x in ipairs(nd) do
+			print("contents: ",x[1], " & ", x[2])
+		end
 	end
 
 end
@@ -1867,9 +1998,6 @@ function love.draw(mouseX, mouseY)
 				love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
 				love.graphics.setFont(font14)
 				teamColours[levelProgress[button.name]][4] = 1
-
-				
-	
 			end
 
 			--black interior before image
@@ -1893,12 +2021,16 @@ function love.draw(mouseX, mouseY)
 			love.graphics.setColor(1,1,1)
 			love.graphics.circle('line',button.x,button.y,button.height)
 
+		elseif button.shape == "text" then
+			love.graphics.setFont(font30)
+			love.graphics.setColor(1,1,1)
+			love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
 
 		end
 	end
 
 
-	
+	love.graphics.setFont(font14)
 	love.graphics.setColor(1,1,1,1)
 	love.graphics.print("FPS: "..tostring(love.timer.getFPS( )), 10, 60)
 
@@ -1956,8 +2088,20 @@ function love.draw(mouseX, mouseY)
 		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
 		if buttonsOnScreen[highlightedButton].shape == "circle" then
 			love.graphics.circle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width)
-		else
+		elseif buttonsOnScreen[highlightedButton].shape == "rectangle" then
 			love.graphics.rectangle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width, buttonsOnScreen[highlightedButton].height,5,5)
+		elseif buttonsOnScreen[highlightedButton].shape == "text" then
+			love.graphics.setFont(font30)
+			love.graphics.setColor(0.9, 0.9, 0.2, 0.1)
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
 		end
 	else
 		love.mouse.setCursor()
@@ -2355,7 +2499,7 @@ function love.draw(mouseX, mouseY)
 
 		--draw wall grip points editor guide
 		if editor then
-
+			love.graphics.setColor(1,1,1)
 			for g = 1, 20 do
 				love.graphics.points(wall.startX+math.sin(g/10*math.pi)*70, wall.startY+math.cos(g/10*math.pi)*70)
 				love.graphics.points(wall.endX+math.sin(g/10*math.pi)*70, wall.endY+math.cos(g/10*math.pi)*70)

@@ -20,8 +20,6 @@ To Do List
 
 	-	let AI cut points vary, depending on populations?
 
-	-	fix indecision connection issue - indecision = create and immediately or shortly cancel which loops
-
 	-	make AI judge differences after moving the distance or ignore while moving? never cancel while on route?
 
 -	add upto level 5
@@ -31,8 +29,6 @@ To Do List
 -	add upto level 15
 
 -	add upto level 20
-
-- 	add control bar icons at the bottom
 
 - 	add timer
 
@@ -44,7 +40,15 @@ To Do List
 
 -	pause when window in background?
 
--	fix initial glow delivery burst -- building up send timer while tentacle on route?
+-	opposition issue, maybe only when one is latched, sometimes slip past each other
+
+-	add music?
+
+-	add sounds?
+
+-	make mute button functional
+
+-	add node repulsion from each other, to stop overlapping by poor user choices in editor
 
 
 -	Improve menu
