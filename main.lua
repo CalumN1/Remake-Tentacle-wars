@@ -327,7 +327,8 @@ function love.load()
 
 	function isMouseInButton()
 		
-		for buttonIndex, button in ipairs(buttonsOnScreen) do
+		for buttonIndex = #buttonsOnScreen, 1, -1 do
+			local button = buttonsOnScreen[buttonIndex]
 			if button.shape == "rectangle" or button.shape == "text" then
 				if math.abs(love.mouse.getX() - (button.x+button.width/2)) < button.width/2 and math.abs(love.mouse.getY() - (button.y+button.height/2)) < button.height/2 then
 					--print(button.name, " button pressed")
@@ -687,6 +688,8 @@ function love.update(dt)
 			-- move this to run only when a cut, node-loss, or new connection is made
 			checkOpposedConnections()
 
+			nodeRepulsion()
+
 			
 			updateMovingConnections() --main update processes
 
@@ -735,6 +738,7 @@ function updateMovingConnections()
 						nodes[connection.source].population = nodes[connection.source].population - 1
 						table.remove(connections, connectionIndex)
 						adjustConnectionIndexes(connectionIndex)
+						print("connection removed")
 					end
 					
 				end
@@ -745,8 +749,8 @@ function updateMovingConnections()
 				if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.sourceEdge.x, connection.sourceEdge.y) then
 					-- closer to target, so its long and needs to move back
 					--print(connection.opposedConnectionIndex)
-					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 or 
-						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 10 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
+					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 5 or 
+						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 20 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
 						-- touching
 						for linkIndex, link in ipairs(connection.links) do
 							link.x = link.x - (connection.linkXStep/20) -- back
@@ -872,7 +876,6 @@ function updateMovingConnections()
 										nodes[connection.target].population = math.abs(nodes[connection.target].population)
 										for connectionIndex2, connection2 in ipairs(connections) do
 											if connection2.source == connection.target then
-												connection2.destination = 0
 												connection2.moving = true
 												if connection2.opposedConnectionIndex > 0 then
 													connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
@@ -880,7 +883,7 @@ function updateMovingConnections()
 													connections[connection2.opposedConnectionIndex].destination = 2
 													connection2.opposedConnectionIndex = 0
 												end
-												
+												connection2.destination = 0
 											end
 										end
 									else
@@ -904,6 +907,8 @@ function updateMovingConnections()
 
 						--nodes[connection.source].population = nodes[connection.source].population - 1
 						table.remove(connections, connectionIndex)
+						print("split connection removed")
+
 					end
 				end
 
@@ -915,13 +920,18 @@ function updateMovingConnections()
 			end
 
 			if nodes[connection.source].population == 0 and connection.moving == true and connection.destination ~= 0 and connection.destination ~= 3 then
-				connection.destination = 0
+				
 				nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 				nodes[connection.source].population = nodes[connection.source].population + 1
 				if connection.destination == 1 then
+					connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0
 					connections[connection.opposedConnectionIndex].destination = 2
 					connections[connection.opposedConnectionIndex].moving = true
+					connection.opposedConnectionIndex = 0
+
 				end
+				connection.destination = 0
+				print("not enough, recalling")
 			end
 		end
 	end
@@ -1018,8 +1028,6 @@ function glowDelivery()
 		
 	end
 
-
-
 end
 
 
@@ -1032,6 +1040,7 @@ function checkOpposedConnections()
 				connection2.opposedConnectionIndex == 0 and connection1.destination > 0 and connection2.destination > 0 then 
 
 				if connection1.team == connection2.team and connection1.destination ~= 3 then
+					--same team
 					if connectionIndex1 < connectionIndex2 then
 						connection1.destination = 0
 						connection2.destination = 2
@@ -1046,8 +1055,8 @@ function checkOpposedConnections()
 
 					connection1.opposedConnectionIndex= connectionIndex2
 					connection2.opposedConnectionIndex= connectionIndex1
-					print("OPPOSED! node,team - node,team",connection[connection1.opposedConnectionIndex].source, connection[connection1.opposedConnectionIndex].team, " - ", connection[connection2.opposedConnectionIndex].source, connection[connection2.opposedConnectionIndex].team)
-
+					print("OPPOSED! node,team - node,team",connections[connection1.opposedConnectionIndex].source, connections[connection1.opposedConnectionIndex].team, " - ", connections[connection2.opposedConnectionIndex].source, connections[connection2.opposedConnectionIndex].team)
+					print()
 					connection1.destination = 1
 					connection2.destination = 1
 					
@@ -1055,6 +1064,53 @@ function checkOpposedConnections()
 				connection1.moving = true
 				connection2.moving = true
 			end
+		end
+	end
+
+end
+
+function nodeRepulsion()
+
+	--check distances between all nodes
+	for nodeIndex1, node1 in ipairs(nodes) do 
+		for nodeIndex2, node2 in ipairs(nodes) do 
+
+			if distancebetween(node1.x, node1.y, node2.x, node2.y) < 80 + nodeTiers[node1.tier].radius + nodeTiers[node2.tier].radius then
+				
+				
+				node1.x = node1.x+ (node1.x - node2.x)/80
+				node1.y = node1.y+ (node1.y - node2.y)/80
+				node2.x = node2.x+ (node2.x - node1.x)/80
+				node2.y = node2.y+ (node2.y - node1.y)/80
+
+				if node1.x < 10 then
+					node1.x = 10
+				elseif node1.x > arenaWidth-10 then
+					node1.x = arenaWidth-10
+				end
+
+				if node1.y < 10 then
+					node1.y = 10
+				elseif node1.y > arenaHeight-10 then
+					node1.y = arenaHeight-10
+				end
+
+				if node2.x < 10 then
+					node2.x = 10
+				elseif node2.x > arenaWidth-10 then
+					node2.x = arenaWidth-10
+				end
+
+				if node2.y < 10 then
+					node2.y = 10
+				elseif node2.y > arenaHeight-10 then
+					node2.y = arenaHeight-10
+				end
+				
+			end
+
+
+
 		end
 	end
 
@@ -1242,6 +1298,9 @@ function cutConnection(connectionIndex, connection, ix, iy)
 		connection.destination = 0
 		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 		if connection.opposedConnectionIndex > 0 then
+			connections[connection.opposedConnectionIndex].moving = true
+			connections[connection.opposedConnectionIndex].destination = 2
+			connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0 
 			connection.opposedConnectionIndex = 0
 			--print(connectionIndex, connection.opposedConnectionIndex)
 		end
@@ -1417,12 +1476,18 @@ function love.mousepressed(mouseX, mouseY)
 			menuButtons[#menuButtons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
 			menuButtons[#menuButtons-20+currentLevel+1].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(currentLevel)/20))
 		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
-			if not editor then
+			if currentLevel >= 1 then
 				connections = {}
+
 				levelNodesTable = levelNodes(arenaWidth,arenaHeight)
 				nodes = levelNodesTable[currentLevel] 
-			else
-
+			elseif currentLevel == 0.5 then --editor level
+				connections = {}
+				for nodeIndex, node in ipairs(nodes) do 
+					node.team = editorSaveState[nodeIndex].team
+					node.population = editorSaveState[nodeIndex].population
+					node.tentaclesUsed = 0
+				end
 			end
 
 			calculateNodeDistances() -- necessary?
@@ -1460,7 +1525,7 @@ function love.mousepressed(mouseX, mouseY)
 			editor = not editor --switch editor mode
 			--check what editor state we've just moved to
 			if editor then	-- also set occupied number for neutral nodes
-				--print ("enode1 pop: ", editorSaveState[1].population)
+				currentLevel = 0
 				
 				for nodeIndex, node in ipairs(nodes) do 
 					node.team = editorSaveState[nodeIndex].team
@@ -1473,6 +1538,7 @@ function love.mousepressed(mouseX, mouseY)
 
 				buttonsOnScreen = editorButtons
 			else --i.e. now in testing
+				currentLevel = 0.5
 				--print ("enode1 pop: ", editorSaveState[1].population)
 				editorSaveState = {}
 				for nodeIndex, node in ipairs(nodes) do 
@@ -1520,6 +1586,22 @@ function love.mousepressed(mouseX, mouseY)
 
 		elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
 			dragging = true
+
+		elseif buttonsOnScreen[buttonSelected].name == "DeleteX" then
+			for b = #buttonsOnScreen, 1, -1 do
+				if buttonsOnScreen[b].name == "DeleteX"  then
+					--table.remove(buttonsOnScreen, b)
+					break
+				end
+			end
+			if editorSelected.index > 0 then
+				if editorSelected.node then
+					table.remove(nodes, editorSelected.index)
+				else
+					table.remove(walls, editorSelected.index)
+				end
+				editorSelected.index = 0
+			end
 			
 		elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
 			local existsAlready = false
@@ -2038,6 +2120,8 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 60)
 
+	love.graphics.print("Zone: ".. currentLevel, 150,90)
+
 	--draw total power ratio bar
 	local totalTeamPowers = {0,0,0}
 	local totalPower = 0
@@ -2063,11 +2147,12 @@ function love.draw(mouseX, mouseY)
 
 
 	--highlight
+	local highlightedNode = isMouseInNode()
 	if editor == false then
-		local highlightedNode = isMouseInNode()
+		
 		if highlightedNode > 0 then
-			love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
-			love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius)
+			love.graphics.setColor(0.9, 0.9, 0.2, 0.4)
+			love.graphics.circle('fill', nodes[highlightedNode].x, nodes[highlightedNode].y, nodeTiers[nodes[highlightedNode].tier].radius+2)
 		end
 	--[[elseif nodeSelected > 0 then
 		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
@@ -2075,7 +2160,7 @@ function love.draw(mouseX, mouseY)
 	else
 		if editorSelected.index > 0 then
 			if editorSelected.node and #nodes > 0 then --node
-				love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+				love.graphics.setColor(0.9, 0.9, 0.2, 0.4)
 				love.graphics.circle('fill', nodes[editorSelected.index].x, nodes[editorSelected.index].y, nodeTiers[nodes[editorSelected.index].tier].radius+2)
 			end
 			--wall highlight is done on wall creation as the shape is too complicated to redo again here
@@ -2128,6 +2213,9 @@ function love.draw(mouseX, mouseY)
 
 	--connection links, link wigglers
 	for connectionIndex, connection in ipairs(connections) do 
+
+		love.graphics.print("destination: "..connection.destination,connection.connectionMidPoint.x, connection.connectionMidPoint.y)
+
 		love.graphics.setColor(0.9, 0.9, 0.2)
 
 		-- link making and wobble:
@@ -2152,6 +2240,7 @@ function love.draw(mouseX, mouseY)
 			elseif Index+1 == 2 or Index == #connection.links -2 then
 				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
 				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
+
 			end
 
 			--bigger wobble when moving?
@@ -2180,7 +2269,9 @@ function love.draw(mouseX, mouseY)
 					local linkToTargetDist
 					if connection.destination == 1 then
 						-- if something flags here its probably to do with tentacle end 
-						--print(connections[connection.opposedConnectionIndex].tentacleEnd.x)
+						print(connection.opposedConnectionIndex, " & ", connectionIndex)
+						print(#connections)
+						print(connections[connection.opposedConnectionIndex].tentacleEnd.x)
 						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
 						
 					else
@@ -2307,9 +2398,20 @@ function love.draw(mouseX, mouseY)
 
 		--node feelers and wobblers
 		love.graphics.setLineWidth( 1 )
+
 		
 			
 		for i = 1, 8 do
+			if editor then
+				if nodeIndex == editorSelected.index  then
+					love.graphics.setColor(1, 1, 0.8)
+				end
+			else
+				if nodeIndex == highlightedNode then
+					love.graphics.setColor(1, 1, 0.8)
+				end
+			end
+
 			if node.tier > 1 then
 				if node.tier == 2 then
 					--node feelers
@@ -2331,6 +2433,16 @@ function love.draw(mouseX, mouseY)
 
 					if node.tier ~= 5 then
 					--node feelers
+						if editor then
+							if nodeIndex == editorSelected.index  then
+								love.graphics.setColor(1, 1, 0.8)
+							end
+						else
+							if nodeIndex == highlightedNode then
+								love.graphics.setColor(1, 1, 0.8)
+							end
+						end
+
 						love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
 							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - InnerWobblerRadius,
 							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - InnerWobblerRadius,
@@ -2393,6 +2505,16 @@ function love.draw(mouseX, mouseY)
 						end
 
 					elseif node.tier == 5 then --ant - 2 feelers each and basic extra wobblers
+
+						if editor then
+							if nodeIndex == editorSelected.index  then
+								love.graphics.setColor(1, 1, 0.8)
+							end
+						else
+							if nodeIndex == highlightedNode then
+								love.graphics.setColor(1, 1, 0.8)
+							end
+						end
 
 						--rotate the whole screen centred on the node, redraw the feeler
 						love.graphics.translate(node.x-2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)

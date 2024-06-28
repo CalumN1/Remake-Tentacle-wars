@@ -36,11 +36,9 @@ To Do List
 
 -	add power limits?
 
-- 	add "zone"/level number to top
-
 -	pause when window in background?
 
--	opposition issue, maybe only when one is latched, sometimes slip past each other
+-	still a rare opposition issue, maybe only when one is latched, sometimes slip past each other
 
 -	add music?
 
@@ -48,15 +46,11 @@ To Do List
 
 -	make mute button functional
 
--	add node repulsion from each other, to stop overlapping by poor user choices in editor
-
 
 -	Improve menu
 
 	-	menu transition fade
 
--	create an editor 
-
 -	let the editor permenantly save to the levels file/a new file
 
--	the editor should use a GUI
+-	fix the look of the editor 
