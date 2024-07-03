@@ -15,9 +15,7 @@ function levelNodes(arenaWidth,arenaHeight)
 		        tentaclesUsed = 0,
 		    	effectTimer = 0, 
 	            neutralPower = 20,
-	            neutralTeam = 1, 
-	            neutralPower = 20,
-	            neutralTeam = 1  
+	            neutralTeam = 1 
 		    },
 		    {
 		        x = arenaWidth -300, 

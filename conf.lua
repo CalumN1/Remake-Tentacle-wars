@@ -13,6 +13,8 @@ function love.conf(t)
     t.window.title = "Tentacle Wars - Remake"
     t.window.icon = nil 
 
+    --t.identity = "C:/Users/Calum/AppData/Roaming/LOVE/Tentacle Wars"
+
     t.window.x = nil                    -- The x-coordinate of the window's position in the specified display (number)
     t.window.y = nil                    -- The y-coordinate of the window's position in the specified display (number)
 

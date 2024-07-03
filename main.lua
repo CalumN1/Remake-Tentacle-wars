@@ -24,10 +24,27 @@ function love.load()
 	image_PauseButton = love.graphics.newImage('PauseButton.png')
 	image_ResetButton = love.graphics.newImage('ResetButton.png')
 
+	--love.filesystem.append("custom_levels", "hello" )
+
+	customLevelContents, size = love.filesystem.read( 'custom_levels', 5000 )
+	print(customLevelContents, love.filesystem.getIdentity( ), love.filesystem.getSaveDirectory( ))
+	customLevelNodes, customLevelWalls = {},{}
+
+	customLevels = {}
+	loadMenu = false
+	saveMenu = false
+
+	error = {status = false, message = "no error yet"}
+	
+	love.keyboard.setTextInput( false )
+	love.keyboard.setKeyRepeat(true)
+	inputText = ""
+	allowed_chars = "abcdefghijklmnopqrstuvwxyz 1234567890!#?:,."
+
 
 	cursor = love.mouse.getSystemCursor("hand")
 
-	currentLevel = 100 -- 0 means menu
+	currentLevel = 100 -- 0 means menu, 100+ = custom level
 
 	timer = 0
 
@@ -279,6 +296,11 @@ function love.load()
 		{name = "Green", x=80,y=200, width=200, height=30, shape = "rectangle"}, 
 		{name = "Red", x=80,y=230, width=200, height=30, shape = "rectangle"}, 
 		{name = "Neutral", x=80,y=260, width=200, height=30, shape = "rectangle"}, 
+		--20vv
+		{name = "Overright", x=arenaWidth*0.8,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
+		{name = "Save As", x=arenaWidth*0.7,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
+		{name = "Load", x=arenaWidth*0.6,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
+		{name = "Confirm", x=arenaWidth*0.4,y=arenaHeight*0.4, width=50, height=30, shape = "rectangle"},  
 
 		{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2+50-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
 	}
@@ -296,7 +318,7 @@ function love.load()
 	-- 4 standard and my extra ones -complete, AI, God
 	controlBarButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[5], allButtons[6],allButtons[7]}
 
-	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14] }
+	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14], allButtons[20], allButtons[21], allButtons[22] }
 
 	buttonsOnScreen = { 
 		{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
@@ -553,7 +575,7 @@ function love.update(dt)
 		--print(tickCount, FPSlogicActual)
 
 		--pause 
-		if not pause and (#nodes > 0 or #walls > 0) then
+		if not pause and (#nodes > 0 or #walls > 0) and not loadMenu and not saveMenu then
 
 			deliveryTimer = deliveryTimer - 1/FPSlogicActual
 
@@ -619,10 +641,12 @@ function love.update(dt)
 					node.effectTimer = 0.5
 					--print("Tier UP!")
 					--node
+					adjustConnectionEdges()
 				elseif (node.population < nodeTiers[node.tier].min and node.team ~= 1) or (node.neutralPower < nodeTiers[node.tier].min and node.team == 1) then
 					node.tier = node.tier -1
 					node.effectTimer = 0.5
 					--print("Tier down")
+					adjustConnectionEdges()
 				end
 
 				if node.population > 200 then
@@ -690,6 +714,11 @@ function love.update(dt)
 
 			nodeRepulsion()
 
+			if editor then
+				love.keyboard.setTextInput( true )
+			else
+				love.keyboard.setTextInput( false )
+			end
 			
 			updateMovingConnections() --main update processes
 
@@ -717,6 +746,9 @@ function updateMovingConnections()
 
 	
 	for connectionIndex, connection in ipairs(connections) do
+		--[[if #connection.links > 5 then
+			print("link distance = " .. distancebetween(connection.links[3].x, connection.links[3].y, connection.links[4].x, connection.links[4].y))
+		end]]
 		if connection.moving == true then
 
 			if #connection.links > 0 then
@@ -739,6 +771,7 @@ function updateMovingConnections()
 						table.remove(connections, connectionIndex)
 						adjustConnectionIndexes(connectionIndex)
 						print("connection removed")
+						adjustConnectionEdges()
 					end
 					
 				end
@@ -761,6 +794,7 @@ function updateMovingConnections()
 								nodes[connection.source].population = nodes[connection.source].population + 1
 							end
 						end
+
 						
 					else
 						-- not touching
@@ -815,6 +849,7 @@ function updateMovingConnections()
 					print("Opposition locked")
 					connection.moving = false
 					connections[connection.opposedConnectionIndex].moving = false
+					adjustConnectionEdges()
 				end
 			
 			-- moving a connection to target 
@@ -837,6 +872,7 @@ function updateMovingConnections()
 				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
 				if (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, nodes[connection.target].x, nodes[connection.target].y)) < nodeTiers[nodes[connection.target].tier].radius+2 then
 					connection.moving = false
+					adjustConnectionEdges()
 				end
 
 			-- connection has been split, and splitLink is defined
@@ -908,6 +944,7 @@ function updateMovingConnections()
 						--nodes[connection.source].population = nodes[connection.source].population - 1
 						table.remove(connections, connectionIndex)
 						print("split connection removed")
+						adjustConnectionEdges()
 
 					end
 				end
@@ -1034,6 +1071,15 @@ end
 function checkOpposedConnections()
 
 	for connectionIndex1, connection1 in ipairs(connections) do
+		if connection1.destination ~= 1 and connection1.opposedConnectionIndex > 0 then
+			
+			--connections[connection.opposedConnectionIndex].moving = true
+			--connections[connection.opposedConnectionIndex].destination = 2
+			--connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0 
+			connection.opposedConnectionIndex = 0
+			--print(connectionIndex, connection.opposedConnectionIndex)
+		
+		end
 		for connectionIndex2, connection2 in ipairs(connections) do
 			-- work out if a connection is opposed and set opposed
 			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and 
@@ -1116,6 +1162,23 @@ function nodeRepulsion()
 
 end
 
+function love.textinput(t)
+	for i = 1, #allowed_chars do -- sanitize input
+        if allowed_chars :sub(i,i) == t then -- if char is allowed
+            inputText = inputText ..t -- append what was typed
+        elseif t == "BACKSPACE" then
+        	print("backspace")
+        end
+    end
+    print(inputText)
+end
+
+function love.keypressed(key)
+    if key == "backspace" and inputText ~= "" then
+    	inputText = string.sub(inputText, 1, #inputText-1)
+    end
+end
+
 
 function adjustConnectionIndexes(deletedConnectionIndex)
 
@@ -1138,8 +1201,82 @@ function adjustConnectionIndexes(deletedConnectionIndex)
 		--print("Index:", connectionIndex, ", ", connection.source, " -> ", connection.target, " opposed? = ", connection.opposedConnectionIndex, " moving? = ", connection.moving)
 	end
 
+end
+
+function adjustConnectionEdges()
+
+
+
+	for connectionIndex, connection in ipairs(connections) do
+		if not connection.moving then
+			local edges = calculateNodeEdges(connection.source, connection.target)
+			
+			connection.targetEdge = { x = edges.targetX, y = edges.targetY }
+
+			connection.sourceEdge = { x = edges.sourceX, y = edges.sourceY }
+
+			--fix target side
+			if connection.destination == 2 and distancebetween(edges.targetX, edges.targetY, connection.links[1].x, connection.links[1].y) > 5 then
+				local differenceX = (edges.targetX - connection.links[1].x)
+				local differenceY = (edges.targetY - connection.links[1].y)
+				for linkIndex, link in ipairs(connection.links) do
+					link.x = link.x + differenceX * (1 - (linkIndex-1)/#connection.links)
+					link.y = link.y + differenceY * (1 - (linkIndex-1)/#connection.links)
+				end
+			end
+
+			--fix source side
+			if distancebetween(edges.sourceX, edges.sourceY, connection.links[#connection.links].x, connection.links[#connection.links].y) > 5 then
+				local differenceX = (edges.sourceX - connection.links[#connection.links].x)
+				local differenceY = (edges.sourceY - connection.links[#connection.links].y)
+				for linkIndex, link in ipairs(connection.links) do
+					link.x = link.x + differenceX * ( (linkIndex)/#connection.links)
+					link.y = link.y + differenceY * ( (linkIndex)/#connection.links)
+				end
+			end
+
+			local recheck = false
+			if distancebetween(connection.links[2].x, connection.links[2].y, connection.links[3].x, connection.links[3].y) < 23.5 then
+				table.insert(connection.links, {
+					x = connection.links[#connection.links].x - (connection.linkXStep),
+					y = connection.links[#connection.links].y - (connection.linkYStep)
+					})
+				recheck = true
+			elseif distancebetween(connection.links[2].x, connection.links[2].y, connection.links[3].x, connection.links[3].y) > 26 then
+				table.remove(connection.links, connection.links[#connection.links])
+				recheck = true
+			end
+
+			if recheck then
+				print("links ADJUSTED!!")
+				--fix target side
+				if connection.destination == 2 and distancebetween(edges.targetX, edges.targetY, connection.links[1].x, connection.links[1].y) > 5 then
+					local differenceX = (edges.targetX - connection.links[1].x)
+					local differenceY = (edges.targetY - connection.links[1].y)
+					for linkIndex, link in ipairs(connection.links) do
+						link.x = link.x + differenceX * (1 - (linkIndex-1)/#connection.links)
+						link.y = link.y + differenceY * (1 - (linkIndex-1)/#connection.links)
+					end
+				end
+
+				--fix source side
+				if distancebetween(edges.sourceX, edges.sourceY, connection.links[#connection.links].x, connection.links[#connection.links].y) > 5 then
+					local differenceX = (edges.sourceX - connection.links[#connection.links].x)
+					local differenceY = (edges.sourceY - connection.links[#connection.links].y)
+					for linkIndex, link in ipairs(connection.links) do
+						link.x = link.x + differenceX * ( (linkIndex)/#connection.links)
+						link.y = link.y + differenceY * ( (linkIndex)/#connection.links)
+					end
+				end
+			end
+
+
+		end
+	end
 
 end
+
+
 
 function splitTentacle(connectionIndex, ix, iy)
 
@@ -1262,7 +1399,7 @@ function love.mousereleased(mouseX, mouseY)
 		end
 
 		--create connection
-		if wallIntersection == false and connectionAlreadyExists == false then
+		if wallIntersection == false and connectionAlreadyExists == false and editor == false then
 			createConnection(nodeSelected, releasenode)
 		end
 
@@ -1434,23 +1571,59 @@ function love.mousepressed(mouseX, mouseY)
 	if buttonSelected > 0 then
 		pointSelected = {x = 0, y = 0}
 		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
-			connections = {}
-			levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
-			currentLevel = buttonsOnScreen[buttonSelected].name
-			current_background = game_background
-			nodes = levelNodesTable[currentLevel] 
-			walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
+			if loadMenu then
+				--level selected from editor
+				nodeSelected = 0
+				editorSelected.index = 0
+				nodes = {}
+				walls = {}
+				
+				--local level = 
+				decodeLevelCode(customLevels[buttonsOnScreen[buttonSelected].name].startIndex)
 
-			calculateNodeDistances()
+				currentLevel = buttonsOnScreen[buttonSelected].name+100
 
-			buttonsOnScreen = {}
+				buttonsOnScreen = {}
+				for b = 1, #editorButtons do
+					table.insert(buttonsOnScreen, editorButtons[b])
+				end	
 
-			for b = 1, #controlBarButtons do
-				table.insert(buttonsOnScreen, controlBarButtons[b])
-			end	
+				--nodes, walls = level[1], level[2]
+				
+				--for nodeIndex, node in ipairs(nodes) do
+				--	print(node.team)
+				--end
+
+				calculateNodeDistances() 
+				loadMenu = false
+			
+				editor = true
+
+				
+
+
+			else
+				--level selected from main menu
+				connections = {}
+				levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
+				currentLevel = buttonsOnScreen[buttonSelected].name
+				current_background = game_background
+				nodes = levelNodesTable[currentLevel] 
+				walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
+
+				calculateNodeDistances()
+
+				buttonsOnScreen = {}
+
+				for b = 1, #controlBarButtons do
+					table.insert(buttonsOnScreen, controlBarButtons[b])
+				end	
+			end
 
 		elseif buttonsOnScreen[buttonSelected].name == "Menu" then
 			menuWigglerSeed = createSeed()
+			loadMenu = false
+			saveMenu = false
 			currentLevel = 0
 			editor = false
 			print("EDITOR MODE OFF")
@@ -1476,12 +1649,12 @@ function love.mousepressed(mouseX, mouseY)
 			menuButtons[#menuButtons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
 			menuButtons[#menuButtons-20+currentLevel+1].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(currentLevel)/20))
 		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
-			if currentLevel >= 1 then
+			if currentLevel >= 1 and currentLevel < 100 then
 				connections = {}
 
 				levelNodesTable = levelNodes(arenaWidth,arenaHeight)
 				nodes = levelNodesTable[currentLevel] 
-			elseif currentLevel == 0.5 then --editor level
+			elseif currentLevel > 100 then --editor level
 				connections = {}
 				for nodeIndex, node in ipairs(nodes) do 
 					node.team = editorSaveState[nodeIndex].team
@@ -1512,11 +1685,16 @@ function love.mousepressed(mouseX, mouseY)
 			walls = {}
 			editor = true
 			print("EDITOR MODE ON")
-			buttonsOnScreen = editorButtons
+			buttonsOnScreen = {}
+			for b = 1, #editorButtons do
+				table.insert(buttonsOnScreen, editorButtons[b])
+			end	
 			--[[table.insert(buttonsOnScreen, allButtons[14])
 			for b = 1, #controlBarButtons do
 				table.insert(buttonsOnScreen, controlBarButtons[b])
 			end	]]
+
+			currentLevel = 100.5
 
 		elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
 			calculateNodeDistances() 
@@ -1525,7 +1703,7 @@ function love.mousepressed(mouseX, mouseY)
 			editor = not editor --switch editor mode
 			--check what editor state we've just moved to
 			if editor then	-- also set occupied number for neutral nodes
-				currentLevel = 0
+				--currentLevel = 0
 				
 				for nodeIndex, node in ipairs(nodes) do 
 					node.team = editorSaveState[nodeIndex].team
@@ -1538,7 +1716,7 @@ function love.mousepressed(mouseX, mouseY)
 
 				buttonsOnScreen = editorButtons
 			else --i.e. now in testing
-				currentLevel = 0.5
+				--currentLevel = 100.5
 				--print ("enode1 pop: ", editorSaveState[1].population)
 				editorSaveState = {}
 				for nodeIndex, node in ipairs(nodes) do 
@@ -1672,14 +1850,245 @@ function love.mousepressed(mouseX, mouseY)
 
 				nodes[editorSelected.index].team = editTeam
 			end
-		else
+		elseif buttonsOnScreen[buttonSelected].name == "Overright" then
+			if #nodes > 1 then
+				--local levelCode, size = createLevelCode()
+				--levelCode = "Heya"
+				--size = #levelCode
+				saveExistingLevel(currentLevel-100) --been working on this, a few issues like editor switching from true and false causes AI to start running. 
+				
+			else
+				--error message not enough nodes
+				error.status, error.message = true, "not enough nodes"
+				print("not enough nodes, save cancelled")
+			end
 
+
+		elseif buttonsOnScreen[buttonSelected].name == "Save As" then 
+
+			table.insert(buttonsOnScreen, allButtons[23])
+			saveMenu = true
+			editor = false
+			
+
+		elseif buttonsOnScreen[buttonSelected].name == "Load" then
+			getLevelNames()
+
+			--table.insert(buttonsOnScreen, allButtons[23])
+			loadMenu = true
+			editor = false
+
+			for levelIndex, level in ipairs(customLevels) do
+				table.insert(buttonsOnScreen, menuButtons[2+levelIndex])
+			end
+			
+
+			--decodeLevelCode()
+
+		elseif buttonsOnScreen[buttonSelected].name == "Confirm" then
+			--confirm save name
+			if saveMenu then
+				if #inputText > 0 then
+
+					local levelCode, size = createLevelCode()
+					love.filesystem.append("custom_levels", levelCode )
+					saveMenu = false
+					table.remove(buttonsOnScreen, #buttonsOnScreen)
+				else
+					error.status, error.message = true, "input a level name" -- add error display
+				end
+
+			--[[elseif loadMenu then
+
+				nodeSelected = 0
+				editorSelected.index = 0
+				nodes = {}
+				walls = {}
+				--local level = 
+				decodeLevelCode(customLevels[buttonSelected.name].startIndex)
+				--nodes, walls = level[1], level[2]
+				
+				--for nodeIndex, node in ipairs(nodes) do
+				--	print(node.team)
+				--end
+
+				calculateNodeDistances() 
+				loadMenu = false]]
+			end
+			editor = true
 
 		end
 	end
 
 end
 
+function createLevelCode()
+
+	local levelCode = inputText .. ", "
+	--local totalSum = 0
+
+	--[[		x = arenaWidth / 2,
+		        y = arenaHeight / 2,
+		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+		        population = 60,
+		        tier = 3,
+		        regenTimer = 5,
+		        tentaclesUsed = 0,
+		    	effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1
+	    ]]
+
+
+	for nodeIndex, node in ipairs(nodes) do
+		--x and y is percentage of window to allow changes in window size
+		levelCode = levelCode  .. node.x/arenaWidth .. ", ".. node.y/arenaHeight .. ", ".. node.team .. ", ".. node.population .. ", ".. node.neutralPower .. ", ".. node.neutralTeam .. ", "
+
+		--levelCode = levelCode .. "hi"
+	end
+
+	levelCode = levelCode .. " W " .. ", "
+
+	for wallIndex, wall in ipairs(walls) do
+
+		levelCode = levelCode .. wall.startX/arenaWidth .. ", ".. wall.startY/arenaHeight .. ", ".. wall.endX/arenaWidth .. ", ".. wall.endY/arenaHeight .. ", "
+		
+	end
+
+	levelCode = levelCode .. " | ,"
+
+	return levelCode, #levelCode
+
+end
+
+function getLevelNames()
+	customLevelContents, size = love.filesystem.read( 'custom_levels', 50000 )
+	local splitContents = manualSplit(customLevelContents)
+	local levelDetails = {  --[[ {name = bla, startIndex = 100} ]] }
+
+	table.insert(levelDetails, {name = splitContents[3], startIndex = 4} )
+
+	for index = 3, #splitContents-3 do
+		if splitContents[index] == "|" then
+			table.insert(levelDetails, {name = splitContents[index+1], startIndex = index+2} )
+		end
+	end
+
+	customLevels = levelDetails
+
+end
+
+function saveExistingLevel(customLevelIndex)
+	--This stores the data for your custom levels, | ,
+
+	--customLevelContents, size = love.filesystem.read( 'custom_levels', 50000 )
+
+	--customLevels[customLevelIndex].startIndex
+
+	print("customLevelIndex = ".. customLevelIndex)
+	inputText = customLevels[customLevelIndex].name
+
+	local currentLevelCode, size = createLevelCode()
+
+	local newsave = "This file stores the data for your Tentacle Wars -- Remade custom levels :), | ,"
+
+	for levelIndex, level in ipairs(customLevels) do
+		if levelIndex ~= customLevelIndex then
+			decodeLevelCode(level.startIndex) --sets current level
+			inputText = level.name
+			local levelCode, size = createLevelCode() --uses current level to create code
+			newsave = newsave .. levelCode
+		end
+	end
+
+	newsave = newsave .. currentLevelCode
+
+	success, message = love.filesystem.write( "custom_levels" ,newsave, #newsave )
+	print("SAVE: ", success, ". message: ", message)
+end
+
+
+function decodeLevelCode(startIndex)
+
+	--each node is split up by #
+	--each detail in a node is split by a comma ,
+	--nodes and walls are split up by a W between the nodes section and the walls section
+	--the file ends with a | 
+
+	customLevelContents, size = love.filesystem.read( 'custom_levels', 50000 )
+
+	--local levels = {customLevelContents:match((customLevelContents:gsub("[^"..", ".."]*"..", ", "([^"..", ".."]*)"..", ")))} 
+
+	local addingNodes = true
+
+
+	--customLevelContents
+	--local splitContents = {customLevelContents:match((customLevelContents:gsub("[^"..", ".."]*"..", ", "([^"..", ".."]*)"..", ")))}
+	local splitContents = manualSplit(customLevelContents)
+	--print(splitContents)
+	local index = startIndex
+	while splitContents[index] ~= "|" do
+		--print(splitContents[index])
+
+		--local startingIndex = index - (#nodes*6) - (#walls*4)
+		print("index = ", index, splitContents[index])
+
+		if splitContents[index] == "W" then
+			addingNodes = false
+			
+			--startingIndex = startingIndex + 1
+			print("wall time")
+			index = index + 1
+		end
+
+		print(splitContents[index], splitContents[index] ~= "|", addingNodes) --true true
+		if splitContents[index] ~= "|" then
+			
+			if addingNodes then
+				local nodeDetails = {x = splitContents[index]*arenaWidth, y = splitContents[index+1]*arenaHeight , team = splitContents[index+2] , population = splitContents[index+3] ,
+				 tier = 1, regenTimer = 5, tentaclesUsed = 0, effectTimer = 0, neutralPower = splitContents[index+4] , neutralTeam = splitContents[index+5] }
+				table.insert(nodes, nodeDetails  )
+				print("team = ", nodeDetails.team, splitContents[index+2], "index = " ,index) --misaligned
+				index = index + 5
+			else
+				table.insert(walls, {startX = splitContents[index]*arenaWidth , startY = splitContents[index+1]*arenaHeight , endX = splitContents[index+2]*arenaWidth , endY = splitContents[index+3]*arenaHeight } )
+				index = index + 3
+				print("adding wall ", walls[#walls][4] )
+			end
+		end
+
+		index = index + 1
+	end
+	print("end load, ", #splitContents, splitContents[1])
+
+
+	--return {customNodes, customWalls}
+end
+
+function manualSplit(aGivenString)
+
+	local currentStringSegment = ""
+	local outputTable = {}
+	for index = 1, #aGivenString do
+		local currentDigit = aGivenString:sub(index, index)
+		if currentDigit == "," then
+			--assert(type(currentStringSegment) == "string", "input must be a string")
+			local currentNumberSegment = tonumber(currentStringSegment)
+			if currentNumberSegment ~= nil then
+				currentStringSegment = currentNumberSegment
+			end
+			print(currentStringSegment)
+			--assert(type(currentStringSegment) == "number", "conversion failed!")
+			table.insert(outputTable, currentStringSegment)
+			currentStringSegment = ""
+		elseif currentDigit ~= " " then
+			currentStringSegment = currentStringSegment .. currentDigit
+		end
+
+	end
+
+	return outputTable
+end
 
 
 function enemyAI()
@@ -2023,6 +2432,28 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.setFont(font14)
 
+	if saveMenu then
+		love.graphics.setColor(0.4,0.4,0.4)
+		love.graphics.rectangle('fill', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
+		--border
+		love.graphics.setColor(0.6,0.6,0.6)
+		love.graphics.rectangle('line', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
+		love.graphics.setColor(1,1,1)
+		love.graphics.printf("Save", arenaWidth/3,arenaHeight/2.5,arenaWidth/3, 'center')
+		love.graphics.printf(inputText, arenaWidth/3,arenaHeight/2,arenaWidth/3, 'center')
+	elseif loadMenu then
+		love.graphics.setColor(0.4,0.4,0.4)
+		love.graphics.rectangle('fill', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
+		--border
+		love.graphics.setColor(0.6,0.6,0.6)
+		love.graphics.rectangle('line', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
+		love.graphics.setColor(1,1,1)
+		for levelIndex, level in ipairs(customLevels) do
+			love.graphics.print(level.name, arenaWidth/2, arenaHeight/2)
+
+		end
+	end
+
 	--draw buttons
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
 		love.graphics.setColor(0.3,0.3,0.3)
@@ -2077,7 +2508,12 @@ function love.draw(mouseX, mouseY)
 				love.graphics.circle('fill',button.x,button.y,button.height)
 				love.graphics.setColor(1,1,1)
 				love.graphics.setFont(nodefont38)
-				love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
+				if loadMenu then 
+					love.graphics.printf(string.sub(customLevels[button.name].name,1,1),button.x-button.width,button.y-16, 2*button.width,'center')
+				else
+					love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
+				end
+				
 				love.graphics.setFont(font14)
 				teamColours[levelProgress[button.name]][4] = 1
 			end
@@ -2121,6 +2557,11 @@ function love.draw(mouseX, mouseY)
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 60)
 
 	love.graphics.print("Zone: ".. currentLevel, 150,90)
+
+	love.graphics.print("buttons On Screen: " .. #buttonsOnScreen, 250,90)
+	love.graphics.print("editor: " .. tostring(editor), 430,90)
+	love.graphics.print("nodes: " .. #nodes, 560,90)
+
 
 	--draw total power ratio bar
 	local totalTeamPowers = {0,0,0}
@@ -2271,7 +2712,7 @@ function love.draw(mouseX, mouseY)
 						-- if something flags here its probably to do with tentacle end 
 						print(connection.opposedConnectionIndex, " & ", connectionIndex)
 						print(#connections)
-						print(connections[connection.opposedConnectionIndex].tentacleEnd.x)
+						print(connections[connection.opposedConnectionIndex].tentacleEnd.x) -- issues here, opposedconnection index
 						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
 						
 					else
