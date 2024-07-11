@@ -1,12 +1,10 @@
 To Do List
 
-- 	fix connection edges changing as nodes tier up and down
-
--	fix initial connection edges with extraspacing variable
+- 	fix connection edges being in between the cut off, so currently each time a tier up happens links are removed and added back and forth as it is inbetween cutoffs
 
 -	fix feelers to arc correctly
 
--	find solution for if the game cant garuantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
+-	find solution for if the game cant guarantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
 
 -	adjust delivery speeds
 
@@ -30,6 +28,8 @@ To Do List
 
 -	add upto level 20
 
+-	add level complete menu
+
 - 	add timer
 
 -	add scoring, only based on timer? or 
@@ -46,11 +46,8 @@ To Do List
 
 -	make mute button functional
 
-
 -	Improve menu
 
 	-	menu transition fade
-
--	let the editor permenantly save to the levels file/a new file
 
 -	fix the look of the editor 

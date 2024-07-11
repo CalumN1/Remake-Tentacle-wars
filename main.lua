@@ -16,6 +16,7 @@ function love.load()
 
 	game_background = love.graphics.newImage('TwarsBackgroundClean.png')
 	menu_background = love.graphics.newImage('TwarsMenuBackgroundClean.png')
+	--preview_background = love.graphics.newImage('TwarsBackgroundClean.png',{false,false,5})
 
 	current_background = game_background
 
@@ -28,7 +29,7 @@ function love.load()
 
 	customLevelContents, size = love.filesystem.read( 'custom_levels', 5000 )
 	print(customLevelContents, love.filesystem.getIdentity( ), love.filesystem.getSaveDirectory( ))
-	customLevelNodes, customLevelWalls = {},{}
+
 
 	customLevels = {}
 	loadMenu = false
@@ -39,7 +40,7 @@ function love.load()
 	love.keyboard.setTextInput( false )
 	love.keyboard.setKeyRepeat(true)
 	inputText = ""
-	allowed_chars = "abcdefghijklmnopqrstuvwxyz 1234567890!#?:,."
+	allowed_chars = "abcdefghijklmnopqrstuvwxyz 1234567890!#?:."
 
 
 	cursor = love.mouse.getSystemCursor("hand")
@@ -52,7 +53,7 @@ function love.load()
 	AION = true
 	editor = false
 	createMicrobe = true
-	dragging = false
+	dragging = false --still used?
 	pause = false
 
 	editPower = 10
@@ -71,6 +72,7 @@ function love.load()
 	nodefont27 = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
 	nodefont38 = love.graphics.newFont('Fonts/editundo.ttf', 38, 'none',1)
 	titlefont = love.graphics.newFont('Fonts/Pulp Fiction M54.ttf', 120, 'none',1)
+	monofont = love.graphics.newFont('Fonts/PWTHMSEG.ttf', 19, 'none',1)
 	font21 = love.graphics.newFont(21)
 	font30 = love.graphics.newFont(30)
 
@@ -244,6 +246,9 @@ function love.load()
 		}]]
 	}
 
+	previewNodes = {}
+	previewWalls = {}
+
 	teamColours = {
 		{0.7, 0.7, 0.7, 1},
 		{0.1, 0.7, 0.1, 1},
@@ -330,7 +335,18 @@ function love.load()
 		{name = "Complete", x=10,y=30, width=80, height=30, shape = "rectangle"} 
 	}
 
-	
+	outerLevelPositions = {}
+
+	for i = 0, 19 do
+		table.insert(outerLevelPositions, {x = arenaWidth/2+330*(math.sin(2*math.pi*i/20)),  y = arenaHeight/2+50-330*(math.cos(2*math.pi*i/20)) } )
+	end
+
+	innerLevelPositions = {}
+
+	for i = 0, 19 do
+		table.insert(innerLevelPositions, {x = arenaWidth/2+270*(math.sin(2*math.pi*i/20)),  y = arenaHeight/2+50-270*(math.cos(2*math.pi*i/20)) } )
+	end
+
 
 	levelProgress = {1,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3} -- 1 = unlocked, 2 = completed, 3 = locked --to match team colours
 
@@ -359,7 +375,12 @@ function love.load()
 			else --circle
 				if distancebetween(love.mouse.getX(), love.mouse.getY(), button.x, button.y) < button.width+5 then
 					--print(button.name, " button pressed")
+					--print(buttonIndex, distancebetween(love.mouse.getX(), love.mouse.getY(), button.x, button.y))
 					return buttonIndex
+				elseif loadMenu and type(button.name) ~= "string" then
+					if distancebetween(love.mouse.getX(), love.mouse.getY(), outerLevelPositions[button.name].x, outerLevelPositions[button.name].y)  < button.width+5 then
+						return buttonIndex
+					end
 				end
 			end
 
@@ -635,19 +656,8 @@ function love.update(dt)
 
 
 				end
-				-- tier change
-				if node.population > nodeTiers[node.tier].max or (node.neutralPower > nodeTiers[node.tier].max and node.team == 1) then 
-					node.tier = node.tier + 1
-					node.effectTimer = 0.5
-					--print("Tier UP!")
-					--node
-					adjustConnectionEdges()
-				elseif (node.population < nodeTiers[node.tier].min and node.team ~= 1) or (node.neutralPower < nodeTiers[node.tier].min and node.team == 1) then
-					node.tier = node.tier -1
-					node.effectTimer = 0.5
-					--print("Tier down")
-					adjustConnectionEdges()
-				end
+
+				tierChange(node)
 
 				if node.population > 200 then
 					node.population = 200
@@ -732,12 +742,30 @@ function love.update(dt)
 			--nothing? will unpause in the mouse pressed function
 		end
 
+		checkHover()
+
 
 		accumulator = accumulator - 1/FPSlogicTarget
 
 		if accumulator > 1 then		--limit catchup
 			accumulator = 1
 		end
+	end
+end
+
+function tierChange(node)
+	-- tier change
+	if node.population > nodeTiers[node.tier].max or (node.neutralPower > nodeTiers[node.tier].max and node.team == 1) then 
+		node.tier = node.tier + 1
+		node.effectTimer = 0.5
+		--print("Tier UP!")
+		--node
+		adjustConnectionEdges()
+	elseif (node.population < nodeTiers[node.tier].min and node.team ~= 1) or (node.neutralPower < nodeTiers[node.tier].min and node.team == 1) then
+		node.tier = node.tier -1
+		node.effectTimer = 0.5
+		--print("Tier down")
+		adjustConnectionEdges()
 	end
 end
 
@@ -1068,7 +1096,7 @@ function glowDelivery()
 end
 
 
-function checkOpposedConnections()
+function checkOpposedConnections()  -- need to fix rare opposed connection issue
 
 	for connectionIndex1, connection1 in ipairs(connections) do
 		if connection1.destination ~= 1 and connection1.opposedConnectionIndex > 0 then
@@ -1162,9 +1190,11 @@ function nodeRepulsion()
 
 end
 
+
+
 function love.textinput(t)
 	for i = 1, #allowed_chars do -- sanitize input
-        if allowed_chars :sub(i,i) == t then -- if char is allowed
+        if allowed_chars :sub(i,i) == t:gsub("^%u", string.lower) and #inputText < 100 then-- if char is allowed 
             inputText = inputText ..t -- append what was typed
         elseif t == "BACKSPACE" then
         	print("backspace")
@@ -1205,7 +1235,7 @@ end
 
 function adjustConnectionEdges()
 
-
+	--when nodes tier up the tentacles should adjust their length to match the change in distance between edges
 
 	for connectionIndex, connection in ipairs(connections) do
 		if not connection.moving then
@@ -1235,18 +1265,20 @@ function adjustConnectionEdges()
 				end
 			end
 
+			--check if links are too bunched up then remove or add links, then adjust edges based on new link numbers
 			local recheck = false
 			if distancebetween(connection.links[2].x, connection.links[2].y, connection.links[3].x, connection.links[3].y) < 23.5 then
+				table.remove(connection.links, #connection.links)
+				recheck = true
+			elseif distancebetween(connection.links[2].x, connection.links[2].y, connection.links[3].x, connection.links[3].y) > 26 then
 				table.insert(connection.links, {
 					x = connection.links[#connection.links].x - (connection.linkXStep),
 					y = connection.links[#connection.links].y - (connection.linkYStep)
 					})
 				recheck = true
-			elseif distancebetween(connection.links[2].x, connection.links[2].y, connection.links[3].x, connection.links[3].y) > 26 then
-				table.remove(connection.links, connection.links[#connection.links])
-				recheck = true
 			end
 
+			--adjust again
 			if recheck then
 				print("links ADJUSTED!!")
 				--fix target side
@@ -1359,7 +1391,24 @@ function createConnection(sourceNode, targetNode)
 
 end
 
+function checkHover()
 
+	local mouseButton = isMouseInButton()
+
+	if mouseButton > 0 then
+		love.mouse.setCursor(cursor)
+		if loadMenu and type(buttonsOnScreen[mouseButton].name) ~= "string" and #previewNodes == 0 then
+			decodeLevelCode(customLevels[buttonsOnScreen[mouseButton].name].startIndex, false)
+		end
+	elseif #previewNodes > 0 then
+		love.mouse.setCursor()
+		previewNodes = {}
+		previewWalls = {}
+	else
+		love.mouse.setCursor()
+	end
+
+end
 
 function love.mousereleased(mouseX, mouseY)
 
@@ -1484,442 +1533,459 @@ end
 function love.mousepressed(mouseX, mouseY)
 
 	love.mouse.setCursor(cursor)
+
+	if not pause then
 	
-	nodeSelected = isMouseInNode() 
+		nodeSelected = isMouseInNode() 
 
-	local buttonSelected = isMouseInButton()
+		local buttonSelected = isMouseInButton()
 
-	local wallSelected = isMouseInWall()
+		local wallSelected = isMouseInWall()
 
-	if nodeSelected < 1 and buttonSelected < 1 and wallSelected < 1 then
-		--nothing selected
+		if nodeSelected < 1 and buttonSelected < 1 and wallSelected < 1 then
+			--nothing selected
 
-		--point selected for making cuts
-		pointSelected = {x = mouseX, y = mouseY}
+			--point selected for making cuts
+			pointSelected = {x = mouseX, y = mouseY}
 
-		--editor create node/wall 
-		if editor then
-			if createMicrobe then
-				--create node of type specified 
-				if editTeam > 1 then
-					table.insert(nodes, {x = mouseX,
-						y = mouseY,
-						team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-						population = editPower,
-						tier = 3,
-						regenTimer = 5,
-						tentaclesUsed = 0,
-						effectTimer = 0, 
-						neutralPower = 30,
-						neutralTeam = 1 
-						})
+			--editor create node/wall 
+			if editor then
+				if createMicrobe then
+					--create node of type specified 
+					if editTeam > 1 then
+						table.insert(nodes, {x = mouseX,
+							y = mouseY,
+							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+							population = editPower,
+							tier = 3,
+							regenTimer = 5,
+							tentaclesUsed = 0,
+							effectTimer = 0, 
+							neutralPower = 30,
+							neutralTeam = 1 
+							})
+					else
+						table.insert(nodes, {x = mouseX,
+							y = mouseY,
+							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+							population = 0,
+							tier = 3,
+							regenTimer = 5,
+							tentaclesUsed = 0,
+							effectTimer = 0, 
+							neutralPower = editPower,
+							neutralTeam = 1 
+							})
+					end
+					pointSelected = {x = 0, y = 0}
+					nodeSelected = isMouseInNode()
+					editorSelected.node = true
+					editorSelected.index = #nodes
 				else
-					table.insert(nodes, {x = mouseX,
-						y = mouseY,
-						team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
-						population = 0,
-						tier = 3,
-						regenTimer = 5,
-						tentaclesUsed = 0,
-						effectTimer = 0, 
-						neutralPower = editPower,
-						neutralTeam = 1 
-						})
+					--create wall
+					table.insert(walls, {
+						startX = mouseX,
+			    		startY = mouseY, --lower
+			    		endX = (arenaWidth/2+ 1.5*mouseX)/2.5,
+			    		endY = (arenaHeight/2+ 1.5*mouseY)/2.5
+			    	})
+			    	editorSelected.node = false
+					editorSelected.index = #walls
 				end
-				pointSelected = {x = 0, y = 0}
-				nodeSelected = isMouseInNode()
+
+			end
+		elseif nodeSelected > 0 and buttonSelected < 1 and wallSelected < 1 then
+			--node selected
+			pointSelected = {x = 0, y = 0}
+
+			if editor then
 				editorSelected.node = true
-				editorSelected.index = #nodes
-			else
-				--create wall
-				table.insert(walls, {
-					startX = mouseX,
-		    		startY = mouseY, --lower
-		    		endX = (arenaWidth/2+ 1.5*mouseX)/2.5,
-		    		endY = (arenaHeight/2+ 1.5*mouseY)/2.5
-		    	})
-		    	editorSelected.node = false
-				editorSelected.index = #walls
+				editorSelected.index = nodeSelected
+				if nodes[nodeSelected].team ~= 1 then
+					editPower = nodes[nodeSelected].population
+				else
+					editPower = nodes[nodeSelected].neutralPower
+				end
+				editTeam = nodes[nodeSelected].team
 			end
-
+		elseif nodeSelected < 1 and buttonSelected < 1 and wallSelected > 0 and editor then
+			--wall selected
+			editorSelected.node = false
+			editorSelected.index = wallSelected
 		end
-	elseif nodeSelected > 0 and buttonSelected < 1 and wallSelected < 1 then
-		--node selected
-		pointSelected = {x = 0, y = 0}
 
-		if editor then
-			editorSelected.node = true
-			editorSelected.index = nodeSelected
-			if nodes[nodeSelected].team ~= 1 then
-				editPower = nodes[nodeSelected].population
-			else
-				editPower = nodes[nodeSelected].neutralPower
-			end
-			editTeam = nodes[nodeSelected].team
-		end
-	elseif nodeSelected < 1 and buttonSelected < 1 and wallSelected > 0 and editor then
-		--wall selected
-		editorSelected.node = false
-		editorSelected.index = wallSelected
-	end
+		--[[if #editorSaveState > 0 then
+			print(editorSaveState[1].population)
+		end]]
 
-	--[[if #editorSaveState > 0 then
-		print(editorSaveState[1].population)
-	end]]
+		--menu interactions
+		if buttonSelected > 0 then
+			pointSelected = {x = 0, y = 0}
+			if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
+				if loadMenu then
+					--level selected from editor
+					nodeSelected = 0
+					editorSelected.index = 0
+					nodes = {}
+					walls = {}
+					
+					--local level = 
+					decodeLevelCode(customLevels[buttonsOnScreen[buttonSelected].name].startIndex, true)
 
-	--menu interactions
-	if buttonSelected > 0 then
-		pointSelected = {x = 0, y = 0}
-		if type(buttonsOnScreen[buttonSelected].name) ~= "string" then --level number
-			if loadMenu then
-				--level selected from editor
-				nodeSelected = 0
-				editorSelected.index = 0
+					currentLevel = buttonsOnScreen[buttonSelected].name+100
+
+					buttonsOnScreen = {}
+					for b = 1, #editorButtons do
+						table.insert(buttonsOnScreen, editorButtons[b])
+					end	
+
+					--nodes, walls = level[1], level[2]
+					
+					--for nodeIndex, node in ipairs(nodes) do
+					--	print(node.team)
+					--end
+
+					calculateNodeDistances() 
+					loadMenu = false
+				
+					editor = true
+
+				else
+					--level selected from main menu
+					connections = {}
+					levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
+					currentLevel = buttonsOnScreen[buttonSelected].name
+					current_background = game_background
+					nodes = levelNodesTable[currentLevel] 
+					walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
+
+					calculateNodeDistances()
+
+					buttonsOnScreen = {}
+
+					for b = 1, #controlBarButtons do
+						table.insert(buttonsOnScreen, controlBarButtons[b])
+					end	
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Menu" then
+				for i = 3 , #menuButtons do
+					if levelProgress[i-2] == 3 then --locked
+						menuButtons[i].x = innerLevelPositions[i-2].x
+						menuButtons[i].y = innerLevelPositions[i-2].y
+					else
+						menuButtons[i].x = outerLevelPositions[i-2].x
+						menuButtons[i].y = outerLevelPositions[i-2].y
+					end
+				end
+
+				menuWigglerSeed = createSeed()
+				loadMenu = false
+				saveMenu = false
+				currentLevel = 0
+				editor = false
+				--print("EDITOR MODE OFF")
+				current_background = menu_background
+				connections = {}
 				nodes = {}
 				walls = {}
-				
-				--local level = 
-				decodeLevelCode(customLevels[buttonsOnScreen[buttonSelected].name].startIndex)
+				--print("buttons on screen: ", #buttonsOnScreen)
+				buttonsOnScreen = {}
+				for b = 1, #menuButtons do
+					table.insert(buttonsOnScreen, menuButtons[b])
+				end
+				--print("buttons on screen: ", #buttonsOnScreen)
 
-				currentLevel = buttonsOnScreen[buttonSelected].name+100
+			elseif buttonsOnScreen[buttonSelected].name == "God" then
+				godModeON = not godModeON
+			elseif buttonsOnScreen[buttonSelected].name == "AI" then
+				AION = not AION
+			elseif buttonsOnScreen[buttonSelected].name == "Complete" then
+				levelProgress[currentLevel] = 2
+				--unlocks next level
+				levelProgress[currentLevel+1] = 1
+				menuButtons[#menuButtons-20+currentLevel+1].x = outerLevelPositions[currentLevel+1].x
+				menuButtons[#menuButtons-20+currentLevel+1].y = outerLevelPositions[currentLevel+1].y
+			elseif buttonsOnScreen[buttonSelected].name == "Reset" then
+				if currentLevel >= 1 and currentLevel < 100 then
+					connections = {}
 
+					levelNodesTable = levelNodes(arenaWidth,arenaHeight)
+					nodes = levelNodesTable[currentLevel] 
+				elseif currentLevel > 100 then --editor level
+					connections = {}
+					for nodeIndex, node in ipairs(nodes) do 
+						node.team = editorSaveState[nodeIndex].team
+						node.population = editorSaveState[nodeIndex].population
+						node.tentaclesUsed = 0
+					end
+				end
+
+				calculateNodeDistances() -- necessary?
+
+			elseif buttonsOnScreen[buttonSelected].name == "Pause" then
+				pause = true
+
+
+			elseif buttonsOnScreen[buttonSelected].name == "Unlock" then
+				for level, progressNumber in ipairs(levelProgress) do
+					if progressNumber == 3 then
+						levelProgress[level] = 1
+						menuButtons[#menuButtons-20+level].x = outerLevelPositions[level].x
+						menuButtons[#menuButtons-20+level].y = outerLevelPositions[level].y
+					end
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Editor" then
+				current_background = game_background
+				connections = {}
+				nodes = {}
+				walls = {}
+				editor = true
+				print("EDITOR MODE ON")
 				buttonsOnScreen = {}
 				for b = 1, #editorButtons do
 					table.insert(buttonsOnScreen, editorButtons[b])
 				end	
-
-				--nodes, walls = level[1], level[2]
-				
-				--for nodeIndex, node in ipairs(nodes) do
-				--	print(node.team)
-				--end
-
-				calculateNodeDistances() 
-				loadMenu = false
-			
-				editor = true
-
-				
-
-
-			else
-				--level selected from main menu
-				connections = {}
-				levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
-				currentLevel = buttonsOnScreen[buttonSelected].name
-				current_background = game_background
-				nodes = levelNodesTable[currentLevel] 
-				walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
-
-				calculateNodeDistances()
-
-				buttonsOnScreen = {}
-
+				--[[table.insert(buttonsOnScreen, allButtons[14])
 				for b = 1, #controlBarButtons do
 					table.insert(buttonsOnScreen, controlBarButtons[b])
-				end	
-			end
+				end	]]
 
-		elseif buttonsOnScreen[buttonSelected].name == "Menu" then
-			menuWigglerSeed = createSeed()
-			loadMenu = false
-			saveMenu = false
-			currentLevel = 0
-			editor = false
-			print("EDITOR MODE OFF")
-			current_background = menu_background
-			connections = {}
-			nodes = {}
-			walls = {}
-			print("buttons on screen: ", #buttonsOnScreen)
-			buttonsOnScreen = {}
-			for b = 1, #menuButtons do
-				table.insert(buttonsOnScreen, menuButtons[b])
-			end
-			print("buttons on screen: ", #buttonsOnScreen)
+				currentLevel = 100.5
 
-		elseif buttonsOnScreen[buttonSelected].name == "God" then
-			godModeON = not godModeON
-		elseif buttonsOnScreen[buttonSelected].name == "AI" then
-			AION = not AION
-		elseif buttonsOnScreen[buttonSelected].name == "Complete" then
-			levelProgress[currentLevel] = 2
-			--unlocks next level
-			levelProgress[currentLevel+1] = 1
-			menuButtons[#menuButtons-20+currentLevel+1].x = arenaWidth/2+330*(math.sin(2*math.pi*(currentLevel)/20))
-			menuButtons[#menuButtons-20+currentLevel+1].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(currentLevel)/20))
-		elseif buttonsOnScreen[buttonSelected].name == "Reset" then
-			if currentLevel >= 1 and currentLevel < 100 then
-				connections = {}
-
-				levelNodesTable = levelNodes(arenaWidth,arenaHeight)
-				nodes = levelNodesTable[currentLevel] 
-			elseif currentLevel > 100 then --editor level
-				connections = {}
-				for nodeIndex, node in ipairs(nodes) do 
-					node.team = editorSaveState[nodeIndex].team
-					node.population = editorSaveState[nodeIndex].population
-					node.tentaclesUsed = 0
-				end
-			end
-
-			calculateNodeDistances() -- necessary?
-
-		elseif buttonsOnScreen[buttonSelected].name == "Pause" then
-			pause = true
-
-
-		elseif buttonsOnScreen[buttonSelected].name == "Unlock" then
-			for level, progressNumber in ipairs(levelProgress) do
-				if progressNumber == 3 then
-					levelProgress[level] = 1
-					menuButtons[#menuButtons-20+level].x = arenaWidth/2+330*(math.sin(2*math.pi*(level-1)/20))
-					menuButtons[#menuButtons-20+level].y = arenaHeight/2+50-330*(math.cos(2*math.pi*(level-1)/20))
-				end
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Editor" then
-			current_background = game_background
-			connections = {}
-			nodes = {}
-			walls = {}
-			editor = true
-			print("EDITOR MODE ON")
-			buttonsOnScreen = {}
-			for b = 1, #editorButtons do
-				table.insert(buttonsOnScreen, editorButtons[b])
-			end	
-			--[[table.insert(buttonsOnScreen, allButtons[14])
-			for b = 1, #controlBarButtons do
-				table.insert(buttonsOnScreen, controlBarButtons[b])
-			end	]]
-
-			currentLevel = 100.5
-
-		elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
-			calculateNodeDistances() 
-
-			connections = {}
-			editor = not editor --switch editor mode
-			--check what editor state we've just moved to
-			if editor then	-- also set occupied number for neutral nodes
-				--currentLevel = 0
-				
-				for nodeIndex, node in ipairs(nodes) do 
-					node.team = editorSaveState[nodeIndex].team
-					node.population = editorSaveState[nodeIndex].population
-					node.tentaclesUsed = 0
-				end
-				--print ("enode1 pop: ", editorSaveState[1].population)
-				--nodes = editorNodes 
-				--editorNodes is the save state to revert nodes to when leaving testing
-
-				buttonsOnScreen = editorButtons
-			else --i.e. now in testing
-				--currentLevel = 100.5
-				--print ("enode1 pop: ", editorSaveState[1].population)
-				editorSaveState = {}
-				for nodeIndex, node in ipairs(nodes) do 
-					table.insert(editorSaveState, {team = node.team, population = node.population}) 
-				end
-				--print ("saved - enode1 pop: ", editorSaveState[1].population)
-				--editorNodes = nodes --set save state to current setup
-
-				buttonsOnScreen = controlBarButtons
-				table.insert(buttonsOnScreen, allButtons[14])
-
-				
-			end
-			
-			print("TESTING, Testing the edit")
-
-		elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
-			local existsAlready = false
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
-					table.remove(buttonsOnScreen, b)
-					existsAlready = true
-				end
-			end
-			if existsAlready == false then
-				table.insert(buttonsOnScreen, allButtons[15])
-				table.insert(buttonsOnScreen, allButtons[16])
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Create Microbe" then
-			createMicrobe = true
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
-					table.remove(buttonsOnScreen, b)
-				end
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Create Wall" then
-			createMicrobe = false
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
-					table.remove(buttonsOnScreen, b)
-				end
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
-			dragging = true
-
-		elseif buttonsOnScreen[buttonSelected].name == "DeleteX" then
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "DeleteX"  then
-					--table.remove(buttonsOnScreen, b)
-					break
-				end
-			end
-			if editorSelected.index > 0 then
-				if editorSelected.node then
-					table.remove(nodes, editorSelected.index)
-				else
-					table.remove(walls, editorSelected.index)
-				end
-				editorSelected.index = 0
-			end
-			
-		elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
-			local existsAlready = false
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
-					table.remove(buttonsOnScreen, b)
-					existsAlready = true
-				end
-			end
-
-			if existsAlready == false then
-				table.insert(buttonsOnScreen, allButtons[17])
-				table.insert(buttonsOnScreen, allButtons[18])
-				table.insert(buttonsOnScreen, allButtons[19])
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Green" then
-			editTeam = 2
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
-					table.remove(buttonsOnScreen, b)
-				end
-			end
-
-			if editorSelected.node and #nodes > 0 then
-				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
-					nodes[editorSelected.index].population = editPower
-				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
-					nodes[editorSelected.index].population = 0
-					nodes[editorSelected.index].neutralPower = editPower
-				end
-
-				nodes[editorSelected.index].team = editTeam
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Red" then
-			editTeam = 3
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
-					table.remove(buttonsOnScreen, b)
-				end
-			end
-			if editorSelected.node and #nodes > 0 then
-				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
-					nodes[editorSelected.index].population = editPower
-				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
-					nodes[editorSelected.index].population = 0
-					nodes[editorSelected.index].neutralPower = editPower
-				end
-
-				nodes[editorSelected.index].team = editTeam
-			end
-
-		elseif buttonsOnScreen[buttonSelected].name == "Neutral" then
-			editTeam = 1
-			for b = #buttonsOnScreen, 1, -1 do
-				if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
-					table.remove(buttonsOnScreen, b)
-				end
-			end
-			if editorSelected.node and #nodes > 0 then
-				if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
-					nodes[editorSelected.index].population = editPower
-				elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
-					nodes[editorSelected.index].population = 0
-					nodes[editorSelected.index].neutralPower = editPower
-				end
-
-				nodes[editorSelected.index].team = editTeam
-			end
-		elseif buttonsOnScreen[buttonSelected].name == "Overright" then
-			if #nodes > 1 then
-				--local levelCode, size = createLevelCode()
-				--levelCode = "Heya"
-				--size = #levelCode
-				saveExistingLevel(currentLevel-100) --been working on this, a few issues like editor switching from true and false causes AI to start running. 
-				
-			else
-				--error message not enough nodes
-				error.status, error.message = true, "not enough nodes"
-				print("not enough nodes, save cancelled")
-			end
-
-
-		elseif buttonsOnScreen[buttonSelected].name == "Save As" then 
-
-			table.insert(buttonsOnScreen, allButtons[23])
-			saveMenu = true
-			editor = false
-			
-
-		elseif buttonsOnScreen[buttonSelected].name == "Load" then
-			getLevelNames()
-
-			--table.insert(buttonsOnScreen, allButtons[23])
-			loadMenu = true
-			editor = false
-
-			for levelIndex, level in ipairs(customLevels) do
-				table.insert(buttonsOnScreen, menuButtons[2+levelIndex])
-			end
-			
-
-			--decodeLevelCode()
-
-		elseif buttonsOnScreen[buttonSelected].name == "Confirm" then
-			--confirm save name
-			if saveMenu then
-				if #inputText > 0 then
-
-					local levelCode, size = createLevelCode()
-					love.filesystem.append("custom_levels", levelCode )
-					saveMenu = false
-					table.remove(buttonsOnScreen, #buttonsOnScreen)
-				else
-					error.status, error.message = true, "input a level name" -- add error display
-				end
-
-			--[[elseif loadMenu then
-
-				nodeSelected = 0
-				editorSelected.index = 0
-				nodes = {}
-				walls = {}
-				--local level = 
-				decodeLevelCode(customLevels[buttonSelected.name].startIndex)
-				--nodes, walls = level[1], level[2]
-				
-				--for nodeIndex, node in ipairs(nodes) do
-				--	print(node.team)
-				--end
-
+			elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
 				calculateNodeDistances() 
-				loadMenu = false]]
-			end
-			editor = true
 
+				connections = {}
+				editor = not editor --switch editor mode
+				--check what editor state we've just moved to
+				if editor then	-- also set occupied number for neutral nodes
+					--currentLevel = 0
+					
+					for nodeIndex, node in ipairs(nodes) do 
+						node.team = editorSaveState[nodeIndex].team
+						node.population = editorSaveState[nodeIndex].population
+						node.tentaclesUsed = 0
+					end
+					--print ("enode1 pop: ", editorSaveState[1].population)
+					--nodes = editorNodes 
+					--editorNodes is the save state to revert nodes to when leaving testing
+
+					buttonsOnScreen = editorButtons
+				else --i.e. now in testing
+					--currentLevel = 100.5
+					--print ("enode1 pop: ", editorSaveState[1].population)
+					editorSaveState = {}
+					for nodeIndex, node in ipairs(nodes) do 
+						table.insert(editorSaveState, {team = node.team, population = node.population}) 
+					end
+					--print ("saved - enode1 pop: ", editorSaveState[1].population)
+					--editorNodes = nodes --set save state to current setup
+
+					buttonsOnScreen = controlBarButtons
+					table.insert(buttonsOnScreen, allButtons[14])
+
+					
+				end
+				
+				print("TESTING, Testing the edit")
+
+			elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
+				local existsAlready = false
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+						table.remove(buttonsOnScreen, b)
+						existsAlready = true
+					end
+				end
+				if existsAlready == false then
+					table.insert(buttonsOnScreen, allButtons[15])
+					table.insert(buttonsOnScreen, allButtons[16])
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Create Microbe" then
+				createMicrobe = true
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Create Wall" then
+				createMicrobe = false
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "PowerSlider" then
+				dragging = true
+
+			elseif buttonsOnScreen[buttonSelected].name == "DeleteX" then
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "DeleteX"  then
+						--table.remove(buttonsOnScreen, b)
+						break
+					end
+				end
+				if editorSelected.index > 0 then
+					if editorSelected.node then
+						table.remove(nodes, editorSelected.index)
+					else
+						table.remove(walls, editorSelected.index)
+					end
+					editorSelected.index = 0
+				end
+				
+			elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
+				local existsAlready = false
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+						table.remove(buttonsOnScreen, b)
+						existsAlready = true
+					end
+				end
+
+				if existsAlready == false then
+					table.insert(buttonsOnScreen, allButtons[17])
+					table.insert(buttonsOnScreen, allButtons[18])
+					table.insert(buttonsOnScreen, allButtons[19])
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Green" then
+				editTeam = 2
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+
+				if editorSelected.node and #nodes > 0 then
+					if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+						nodes[editorSelected.index].population = editPower
+					elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+						nodes[editorSelected.index].population = 0
+						nodes[editorSelected.index].neutralPower = editPower
+					end
+
+					nodes[editorSelected.index].team = editTeam
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Red" then
+				editTeam = 3
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+				if editorSelected.node and #nodes > 0 then
+					if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+						nodes[editorSelected.index].population = editPower
+					elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+						nodes[editorSelected.index].population = 0
+						nodes[editorSelected.index].neutralPower = editPower
+					end
+
+					nodes[editorSelected.index].team = editTeam
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Neutral" then
+				editTeam = 1
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+				if editorSelected.node and #nodes > 0 then
+					if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+						nodes[editorSelected.index].population = editPower
+					elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+						nodes[editorSelected.index].population = 0
+						nodes[editorSelected.index].neutralPower = editPower
+					end
+
+					nodes[editorSelected.index].team = editTeam
+				end
+			elseif buttonsOnScreen[buttonSelected].name == "Overright" then
+				if #nodes > 1 then
+					--local levelCode, size = createLevelCode()
+					--levelCode = "Heya"
+					--size = #levelCode
+					saveExistingLevel(currentLevel-100) --been working on this, a few issues like editor switching from true and false causes AI to start running. 
+					
+				else
+					--error message not enough nodes
+					error.status, error.message = true, "not enough nodes"
+					print("not enough nodes, save cancelled")
+				end
+
+
+			elseif buttonsOnScreen[buttonSelected].name == "Save As" then 
+
+				exportLevel()
+
+				--table.insert(buttonsOnScreen, allButtons[23])
+				--saveMenu = true
+				--editor = false
+				
+
+			elseif buttonsOnScreen[buttonSelected].name == "Load" then
+				getLevelNames()
+
+				for i = 3 , #menuButtons do
+					menuButtons[i].x = outerLevelPositions[i-2].x
+					menuButtons[i].y = outerLevelPositions[i-2].y
+				end
+
+
+				--table.insert(buttonsOnScreen, allButtons[23])
+				loadMenu = true
+				editor = false
+
+				for levelIndex, level in ipairs(customLevels) do
+					table.insert(buttonsOnScreen, menuButtons[2+levelIndex])
+				end
+				
+
+				--decodeLevelCode()
+
+			elseif buttonsOnScreen[buttonSelected].name == "Confirm" then
+				--confirm save name
+				if saveMenu then
+					if #inputText > 0 then
+
+						local levelCode, size = createLevelCode()
+						love.filesystem.append("custom_levels", levelCode )
+						saveMenu = false
+						table.remove(buttonsOnScreen, #buttonsOnScreen)
+					else
+						error.status, error.message = true, "input a level name" -- add error display
+					end
+
+				--[[elseif loadMenu then
+
+					nodeSelected = 0
+					editorSelected.index = 0
+					nodes = {}
+					walls = {}
+					--local level = 
+					decodeLevelCode(customLevels[buttonSelected.name].startIndex)
+					--nodes, walls = level[1], level[2]
+					
+					--for nodeIndex, node in ipairs(nodes) do
+					--	print(node.team)
+					--end
+
+					calculateNodeDistances() 
+					loadMenu = false]]
+				end
+				editor = true
+
+			end
 		end
 	end
-
 end
 
 function createLevelCode()
@@ -1994,7 +2060,7 @@ function saveExistingLevel(customLevelIndex)
 
 	for levelIndex, level in ipairs(customLevels) do
 		if levelIndex ~= customLevelIndex then
-			decodeLevelCode(level.startIndex) --sets current level
+			decodeLevelCode(level.startIndex, true) --sets current level
 			inputText = level.name
 			local levelCode, size = createLevelCode() --uses current level to create code
 			newsave = newsave .. levelCode
@@ -2008,7 +2074,7 @@ function saveExistingLevel(customLevelIndex)
 end
 
 
-function decodeLevelCode(startIndex)
+function decodeLevelCode(startIndex, fullsize) --not full size if used for editor load custom level preview
 
 	--each node is split up by #
 	--each detail in a node is split by a comma ,
@@ -2025,36 +2091,67 @@ function decodeLevelCode(startIndex)
 	--customLevelContents
 	--local splitContents = {customLevelContents:match((customLevelContents:gsub("[^"..", ".."]*"..", ", "([^"..", ".."]*)"..", ")))}
 	local splitContents = manualSplit(customLevelContents)
+	--splitContents = customLevelContents:explode(",")
 	--print(splitContents)
 	local index = startIndex
+	local scale = {x=arenaWidth, y=arenaHeight, extraX = 0, extraY = 0}
+	if not fullsize then
+		scale = {x=280, y=280, extraX= arenaWidth/2 - 140, extraY = arenaHeight/2 - 90}
+	end
 	while splitContents[index] ~= "|" do
 		--print(splitContents[index])
 
 		--local startingIndex = index - (#nodes*6) - (#walls*4)
-		print("index = ", index, splitContents[index])
+		--print("index = ", index, splitContents[index])
 
 		if splitContents[index] == "W" then
 			addingNodes = false
 			
 			--startingIndex = startingIndex + 1
-			print("wall time")
+			--print("wall time")
 			index = index + 1
 		end
 
-		print(splitContents[index], splitContents[index] ~= "|", addingNodes) --true true
+		--print(splitContents[index], splitContents[index] ~= "|", addingNodes) --true true
 		if splitContents[index] ~= "|" then
-			
-			if addingNodes then
-				local nodeDetails = {x = splitContents[index]*arenaWidth, y = splitContents[index+1]*arenaHeight , team = splitContents[index+2] , population = splitContents[index+3] ,
-				 tier = 1, regenTimer = 5, tentaclesUsed = 0, effectTimer = 0, neutralPower = splitContents[index+4] , neutralTeam = splitContents[index+5] }
-				table.insert(nodes, nodeDetails  )
-				print("team = ", nodeDetails.team, splitContents[index+2], "index = " ,index) --misaligned
-				index = index + 5
-			else
-				table.insert(walls, {startX = splitContents[index]*arenaWidth , startY = splitContents[index+1]*arenaHeight , endX = splitContents[index+2]*arenaWidth , endY = splitContents[index+3]*arenaHeight } )
-				index = index + 3
-				print("adding wall ", walls[#walls][4] )
+
+
+			if fullsize then
+				if addingNodes then
+					local nodeDetails = {x = splitContents[index]*scale.x + scale.extraX, y = splitContents[index+1]*scale.y + scale.extraY, team = splitContents[index+2] , population = splitContents[index+3] ,
+					 tier = 1, regenTimer = 5, tentaclesUsed = 0, effectTimer = 0, neutralPower = splitContents[index+4] , neutralTeam = splitContents[index+5] }
+					table.insert(nodes, nodeDetails  )
+					--print("team = ", nodeDetails.team, splitContents[index+2], "index = " ,index) --misaligned
+					index = index + 5
+				else
+					table.insert(walls, {startX = splitContents[index]*scale.x + scale.extraX , startY = splitContents[index+1]*scale.y + scale.extraY , endX = splitContents[index+2]*scale.x + scale.extraX , endY = splitContents[index+3]*scale.y + scale.extraY } )
+					index = index + 3
+					--print("adding wall ", walls[#walls][4] )
+				end
+			else--preview
+				if addingNodes then
+
+					local nodeDetails = {x = splitContents[index]*scale.x + scale.extraX, y = splitContents[index+1]*scale.y + scale.extraY, team = splitContents[index+2] , population = splitContents[index+3] ,
+					 tier = 1, regenTimer = 5, tentaclesUsed = 0, effectTimer = 0, neutralPower = splitContents[index+4] , neutralTeam = splitContents[index+5] }
+					table.insert(previewNodes, nodeDetails  )
+					--print("team = ", nodeDetails.team, splitContents[index+2], "index = " ,index) --misaligned
+					index = index + 5
+					for i = 0, 5 do
+						tierChange(previewNodes[#previewNodes])
+					end
+					--print("tier = ", previewNodes[#previewNodes].tier)
+				else
+					print("problem: ", splitContents[index])
+					print("index: ", index, " / ", #splitContents)
+					table.insert(previewWalls, {startX = splitContents[index]*scale.x + scale.extraX , startY = splitContents[index+1]*scale.y + scale.extraY , endX = splitContents[index+2]*scale.x + scale.extraX , endY = splitContents[index+3]*scale.y + scale.extraY } )
+					index = index + 3
+					--print("adding wall ", previewWalls[#previewWalls][4] )
+				end
+
+
 			end
+		else
+			index = index - 1 --otherwise the next index++ skips over the | causing problems
 		end
 
 		index = index + 1
@@ -2065,7 +2162,7 @@ function decodeLevelCode(startIndex)
 	--return {customNodes, customWalls}
 end
 
-function manualSplit(aGivenString)
+function manualSplit(aGivenString) -- or a:explode(b) ????? so a = "foo bar":explode(" ")  =>  tbl[1] --> foo
 
 	local currentStringSegment = ""
 	local outputTable = {}
@@ -2073,6 +2170,12 @@ function manualSplit(aGivenString)
 		local currentDigit = aGivenString:sub(index, index)
 		if currentDigit == "," then
 			--assert(type(currentStringSegment) == "string", "input must be a string")
+			print("current segment : ", currentStringSegment:sub(-1, -1))
+			while currentStringSegment:sub(-1, -1) == " " do --not working
+				currentStringSegment = currentStringSegment:sub(0, #currentStringSegment-1)
+				print("trailing spaces removed")
+			end
+
 			local currentNumberSegment = tonumber(currentStringSegment)
 			if currentNumberSegment ~= nil then
 				currentStringSegment = currentNumberSegment
@@ -2080,14 +2183,82 @@ function manualSplit(aGivenString)
 			print(currentStringSegment)
 			--assert(type(currentStringSegment) == "number", "conversion failed!")
 			table.insert(outputTable, currentStringSegment)
+			
 			currentStringSegment = ""
-		elseif currentDigit ~= " " then
+			
+		elseif  currentDigit ~= " " or #currentStringSegment ~= 0 then --#currentStringSegment ~= 0 or
 			currentStringSegment = currentStringSegment .. currentDigit
+			
 		end
-
+		
 	end
 
+
+
+	--print(outputTable[1]..outputTable[2]..outputTable[3]..outputTable[4]..outputTable[5]..outputTable[6]..outputTable[7]..outputTable[8]..outputTable[9]..outputTable[10]..
+		--outputTable[11]..outputTable[12]..outputTable[13]..outputTable[14]..outputTable[15]..outputTable[16]..outputTable[17]..outputTable[18]..outputTable[19]..outputTable[20])
+
 	return outputTable
+end
+
+
+function exportLevel() 
+
+	local exportDetails = "Level details to be copy pasted into levels file, not for use by players  \n\n Nodes Section: \n{	--level	\n"
+
+	--[[
+	{
+		        x = arenaWidth / 2 -150,
+		        y = arenaHeight / 3,
+		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+		        population = 10,
+		        tier = 1,
+		        regenTimer = 5,
+		        tentaclesUsed = 0,
+			    effectTimer = 0, 
+	            neutralPower = 20,
+	            neutralTeam = 1  
+		    },
+
+		    {
+	    		startX = arenaWidth/2.5,
+	    		startY = arenaHeight/2.2, --lower
+	    		endX = arenaWidth/1.9,
+	    		endY = arenaHeight/2.3
+    		}
+
+	]]
+
+	for nodeIndex, node in ipairs(nodes) do
+		--x and y is percentage of window to allow changes in window size
+		exportDetails = exportDetails  .. "	{ \n		x = " .. node.x/arenaWidth .. "*arenaWidth,\n		y =  ".. node.y/arenaHeight .. "*arenaHeight,\n		team =  " .. node.team .. ",\n		population =  " .. node.population .. 
+		",\n		tier =  " .. node.tier .. ",\n		regenTimer = " .. nodeTiers[node.tier].regenDelay .. ", \n		tentaclesUsed = 0,\n		effectTimer = 0,\n		neutralPower = " .. node.neutralPower .. ",\n		neutralTeam =  " ..  node.neutralTeam .. "\n	}"
+
+		if nodeIndex < #nodes then
+			exportDetails = exportDetails  .. ",\n"
+		else
+		exportDetails = exportDetails  .. "	\n}\n"
+		end
+	end
+
+	exportDetails = exportDetails .. "\nWalls section: \n {	--level	\n" 
+
+	for wallIndex, wall in ipairs(walls) do
+
+		exportDetails = exportDetails .. "	{ \n		startX = " .. wall.startX/arenaWidth .. "*arenaWidth,\n		startY =  ".. wall.startY/arenaHeight .. "*arenaHeight,\n		endX = " .. 
+		wall.endX/arenaWidth .. "*arenaWidth,\n		endY =  ".. wall.endY/arenaHeight .. "*arenaHeight \n	}" 
+		
+		if wallIndex < #nodes then
+			exportDetails = exportDetails  .. ",\n"
+		else
+			exportDetails = exportDetails  .. "	\n}\n"
+		end
+	end
+
+
+	success, message = love.filesystem.write( "levelExportFile" , exportDetails, #exportDetails )
+	print("SAVE: ", success, ". message: ", message)
+
 end
 
 
@@ -2432,120 +2603,8 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.setFont(font14)
 
-	if saveMenu then
-		love.graphics.setColor(0.4,0.4,0.4)
-		love.graphics.rectangle('fill', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
-		--border
-		love.graphics.setColor(0.6,0.6,0.6)
-		love.graphics.rectangle('line', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
-		love.graphics.setColor(1,1,1)
-		love.graphics.printf("Save", arenaWidth/3,arenaHeight/2.5,arenaWidth/3, 'center')
-		love.graphics.printf(inputText, arenaWidth/3,arenaHeight/2,arenaWidth/3, 'center')
-	elseif loadMenu then
-		love.graphics.setColor(0.4,0.4,0.4)
-		love.graphics.rectangle('fill', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
-		--border
-		love.graphics.setColor(0.6,0.6,0.6)
-		love.graphics.rectangle('line', arenaWidth/4, arenaHeight/6, arenaWidth/2, arenaHeight/1.5, arenaWidth/50, arenaWidth/50)
-		love.graphics.setColor(1,1,1)
-		for levelIndex, level in ipairs(customLevels) do
-			love.graphics.print(level.name, arenaWidth/2, arenaHeight/2)
 
-		end
-	end
-
-	--draw buttons
-	for buttonIndex, button in ipairs(buttonsOnScreen) do
-		love.graphics.setColor(0.3,0.3,0.3)
-		if button.name == "God" then
-			if godModeON then
-				love.graphics.setColor(0,0.5,0)
-			end
-		end
-		if button.name == "AI" then
-			if AION then
-				love.graphics.setColor(0,0.5,0)
-			end
-		end
-		if button.name == "test&Edit" then
-			if editor then
-				love.graphics.setColor(0,0.5,0)
-			end
-		end
-
-		love.graphics.setLineWidth(3)
-
-		if button.shape == "rectangle" then
-			love.graphics.rectangle('fill',button.x,button.y,button.width, button.height,button.height/5,button.height/5)
-			love.graphics.setColor(1,1,1)
-			if button.name == "CreateX" then
-				if createMicrobe then
-					love.graphics.print("Create Microbe",button.x,button.y)
-				else
-					love.graphics.print("Create Wall",button.x,button.y)
-				end
-
-			elseif button.name == "MicrobeTeam" then
-				if editTeam == 1 then -- 1 = grey, 2 = green, 3 = red
-					love.graphics.print("Neutral",button.x,button.y)
-				elseif editTeam == 2 then -- 1 = grey, 2 = green, 3 = red
-					love.graphics.print("Green",button.x,button.y)
-				elseif editTeam == 3 then -- 1 = grey, 2 = green, 3 = red
-					love.graphics.print("Red",button.x,button.y)
-				end
-
-			elseif button.name == "PowerSlider" then
-				love.graphics.rectangle('fill',editPower+80,button.y-2,16, button.height-4,button.height/5,button.height/5)
-			else
-				love.graphics.print(button.name,button.x,button.y)
-			end
-		elseif button.shape == "circle" then
-
-			if type(button.name) ~= "string" then
-				teamColours[levelProgress[button.name]][4] = 0.5
-
-				love.graphics.setColor(teamColours[levelProgress[button.name]])
-				love.graphics.circle('fill',button.x,button.y,button.height)
-				love.graphics.setColor(1,1,1)
-				love.graphics.setFont(nodefont38)
-				if loadMenu then 
-					love.graphics.printf(string.sub(customLevels[button.name].name,1,1),button.x-button.width,button.y-16, 2*button.width,'center')
-				else
-					love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
-				end
-				
-				love.graphics.setFont(font14)
-				teamColours[levelProgress[button.name]][4] = 1
-			end
-
-			--black interior before image
-			if button.name == "Menu" or button.name == "Mute" or button.name == "Pause" or button.name == "Reset" then
-				love.graphics.setColor(0,0,0)
-				love.graphics.circle('fill',button.x,button.y,button.height)
-			end
-
-			love.graphics.setColor(1,1,1)
-			if button.name == "Menu" then
-				love.graphics.draw(image_QuitMenuButton, button.x-button.width+8, button.y-button.width+8 ,0,0.8,0.8)
-			elseif button.name == "Mute" then
-				love.graphics.draw(image_MuteButton, button.x-button.width+5, button.y-button.width+5 ,0,0.8,0.8)
-			elseif button.name == "Pause" then
-				love.graphics.draw(image_PauseButton, button.x-button.width+8, button.y-button.width+7 ,0,0.8,0.8)
-			elseif button.name == "Reset" then
-				love.graphics.draw(image_ResetButton, button.x-button.width+3, button.y-button.width+4 ,0,0.8,0.8)
-			end
-
-			--border
-			love.graphics.setColor(1,1,1)
-			love.graphics.circle('line',button.x,button.y,button.height)
-
-		elseif button.shape == "text" then
-			love.graphics.setFont(font30)
-			love.graphics.setColor(1,1,1)
-			love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
-
-		end
-	end
+	--draw buttons original position was here
 
 
 	love.graphics.setFont(font14)
@@ -2608,30 +2667,7 @@ function love.draw(mouseX, mouseY)
 		end
 	end
 
-	local highlightedButton = isMouseInButton()
-	if highlightedButton > 0 then
-		love.mouse.setCursor(cursor)
-		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
-		if buttonsOnScreen[highlightedButton].shape == "circle" then
-			love.graphics.circle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width)
-		elseif buttonsOnScreen[highlightedButton].shape == "rectangle" then
-			love.graphics.rectangle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width, buttonsOnScreen[highlightedButton].height,5,5)
-		elseif buttonsOnScreen[highlightedButton].shape == "text" then
-			love.graphics.setFont(font30)
-			love.graphics.setColor(0.9, 0.9, 0.2, 0.1)
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
-			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
-		end
-	else
-		love.mouse.setCursor()
-	end
+	
 
 
 	mouseEffect()
@@ -2829,7 +2865,6 @@ function love.draw(mouseX, mouseY)
 		-- draw node
 		--print(node.x, node.y)
 		love.graphics.circle('fill', node.x, node.y, nodeCentreRadius)
-		love.graphics.setColor(teamColours[node.team])
 		-- node border
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.setLineWidth( 3 )
@@ -3185,7 +3220,7 @@ function love.draw(mouseX, mouseY)
 	end
 
 	--hover node display
-	if not editor then
+	if not editor and not saveMenu and not loadMenu then
 		local mouseNode = isMouseInNode()
 		if mouseNode > 0 then
 			local Xshift = 0
@@ -3258,6 +3293,255 @@ function love.draw(mouseX, mouseY)
 		end
 	end
 
+	--save menu
+	love.graphics.setFont(font14)
+	love.graphics.setLineWidth( 3 )
+
+	if saveMenu then
+
+		local extension = 0
+		if #inputText > 18 then
+			extension = 13*(#inputText - 18)
+		end
+
+		--menu background square
+		love.graphics.setColor(0.4,0.4,0.4)
+		love.graphics.rectangle('fill', arenaWidth/2.5 - extension/2, arenaHeight/2.5, arenaWidth/5 + extension, arenaHeight/5, arenaWidth/50, arenaWidth/50)
+		--border
+		love.graphics.setColor(0.6,0.6,0.6)
+		love.graphics.rectangle('line', arenaWidth/2.5 - extension/2, arenaHeight/2.5, arenaWidth/5 + extension, arenaHeight/5, arenaWidth/50, arenaWidth/50)
+		--text field
+		love.graphics.setColor(0.2,0.2,0.2)
+		love.graphics.rectangle('fill', arenaWidth/2.4 - extension/2, arenaHeight/2.05, arenaWidth/6 + extension, 30) --+30*math.floor(math.abs(#inputText-1)/18)
+		--button (again)
+		love.graphics.setColor(0.3,0.3,0.3)
+		local button = buttonsOnScreen[#buttonsOnScreen]
+		love.graphics.rectangle('fill', button.x,button.y,button.width, button.height, button.height/5, button.height/5)
+		--text
+		love.graphics.setColor(1,1,1)
+		love.graphics.printf("Save", arenaWidth/3,arenaHeight/2.5,arenaWidth/3, 'center')
+		love.graphics.setFont(monofont)
+		love.graphics.printf(inputText, 0 ,arenaHeight/2, arenaWidth, 'center') --+30*looper
+		--[[local looper = 0
+		while math.floor(#inputText/18) >= looper do
+			segment = inputText:sub(1+looper*18, (looper+1)*18)
+			love.graphics.printf(segment, arenaWidth/2.4,arenaHeight/2 +30*looper ,arenaWidth/6, 'center')
+			looper = looper +1
+		end]]
+		love.graphics.setFont(font14)
+	elseif loadMenu then
+		--load menu background square
+		love.graphics.setColor(0.4,0.4,0.4)
+		love.graphics.rectangle('fill', arenaWidth/4.5, arenaHeight/7, arenaWidth*0.555, arenaHeight/1.3, arenaWidth/50, arenaWidth/50)
+
+		-- background
+		-- draw a rectangle as a stencil. Each pixel touched by the rectangle will have its stencil value set to 1. The rest will be 0.
+	    love.graphics.stencil(loadMenuStencilFunction, "replace", 1)
+
+	   -- Only allow rendering on pixels which have a stencil value greater than 0.
+	    love.graphics.setStencilTest("greater", 0)
+
+	    --love.graphics.setColor(0, 1, 0)
+	    --love.graphics.rectangle("fill", arenaWidth/2, arenaHeight/2, 300, 300)
+
+	    love.graphics.setColor(0.9, 0.9, 0.9)
+	    love.graphics.draw(menu_background,0,0 , 0, 1, 1) --arenaWidth/4.5, arenaHeight/7 , 0, 0.7, 0.7
+	    love.graphics.setColor(0.0, 0.0, 0.0,0.3)
+	    love.graphics.circle('fill',arenaWidth/2,arenaHeight/2+50,180)
+
+	    love.graphics.setStencilTest()
+
+
+
+		--border
+		love.graphics.setColor(0.6,0.6,0.6)
+		love.graphics.rectangle('line', arenaWidth/4.5, arenaHeight/7, arenaWidth*0.555, arenaHeight/1.3, arenaWidth/50, arenaWidth/50)
+
+		--level display inner circle and lines
+		love.graphics.setColor(1,1,1)
+		love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180)
+		for i = 0, 19 do --all levels are unlocked by default
+			love.graphics.line(arenaWidth/2+180*(math.sin(2*math.pi*i/20)),   arenaHeight/2+50-180*(math.cos(2*math.pi*i/20)), 
+				arenaWidth/2+ (60 + 235)*(math.sin(2*math.pi*i/20)),    arenaHeight/2+50- (60 + 235)*(math.cos(2*math.pi*i/20)) )
+		end
+
+		--hover level name display
+		local mouseButton = isMouseInButton() 
+		if mouseButton > 0 then
+			if type(buttonsOnScreen[mouseButton].name) ~= "string" then
+				local Xshift = (outerLevelPositions[buttonsOnScreen[mouseButton].name].x - arenaWidth/2 )/1.5
+				local Yshift = (outerLevelPositions[buttonsOnScreen[mouseButton].name].y - arenaHeight/2)/2
+
+				--hover display
+				love.graphics.setColor(0.1, 0.1, 0.1)
+				love.graphics.rectangle('fill', outerLevelPositions[buttonsOnScreen[mouseButton].name].x+Xshift-13*(#customLevels[buttonsOnScreen[mouseButton].name].name)/2-10, 
+					outerLevelPositions[buttonsOnScreen[mouseButton].name].y+Yshift+70-30*math.ceil(#customLevels[buttonsOnScreen[mouseButton].name].name/18), 20+13*(#customLevels[buttonsOnScreen[mouseButton].name].name), 
+					30*math.ceil(#customLevels[buttonsOnScreen[mouseButton].name].name/18) )
+
+				--border
+				love.graphics.setColor(0.7, 0.7, 0.7)
+				love.graphics.setLineWidth( 1 )
+				love.graphics.rectangle('line', outerLevelPositions[buttonsOnScreen[mouseButton].name].x+Xshift-13*(#customLevels[buttonsOnScreen[mouseButton].name].name)/2-10, 
+					outerLevelPositions[buttonsOnScreen[mouseButton].name].y+Yshift+70-30*math.ceil(#customLevels[buttonsOnScreen[mouseButton].name].name/18), 20+13*(#customLevels[buttonsOnScreen[mouseButton].name].name), 
+					30*math.ceil(#customLevels[buttonsOnScreen[mouseButton].name].name/18) )
+
+				love.graphics.setColor(1,1,1)
+				
+				love.graphics.setFont(monofont)
+				love.graphics.printf(customLevels[buttonsOnScreen[mouseButton].name].name, outerLevelPositions[buttonsOnScreen[mouseButton].name].x+Xshift-150, 
+					outerLevelPositions[buttonsOnScreen[mouseButton].name].y+Yshift+10+70-30*math.ceil(#customLevels[buttonsOnScreen[mouseButton].name].name/18), 300, 'center')
+				love.graphics.setFont(font14)
+
+				--print(buttonsOnScreen[mouseButton].name, mouseButton)
+
+				hoverLevelDisplayDRAW(buttonsOnScreen[mouseButton].name)
+			end
+		else
+			previewNodes = {}
+			previewWalls = {}
+		end
+
+
+	end
+
+	--draw buttons
+	for buttonIndex, button in ipairs(buttonsOnScreen) do
+		love.graphics.printf(button.name,button.x+button.width,button.y-16, 2*button.width,'center')
+
+		love.graphics.setColor(0.3,0.3,0.3)
+		if button.name == "God" then
+			if godModeON then
+				love.graphics.setColor(0,0.5,0)
+			end
+		end
+		if button.name == "AI" then
+			if AION then
+				love.graphics.setColor(0,0.5,0)
+			end
+		end
+		if button.name == "test&Edit" then
+			if editor then
+				love.graphics.setColor(0,0.5,0)
+			end
+		end
+
+		love.graphics.setLineWidth(3)
+
+		if button.shape == "rectangle" then
+			love.graphics.rectangle('fill',button.x,button.y,button.width, button.height,button.height/5,button.height/5)
+			love.graphics.setColor(1,1,1)
+			if button.name == "CreateX" then
+				if createMicrobe then
+					love.graphics.print("Create Microbe",button.x,button.y)
+				else
+					love.graphics.print("Create Wall",button.x,button.y)
+				end
+
+			elseif button.name == "MicrobeTeam" then
+				if editTeam == 1 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Neutral",button.x,button.y)
+				elseif editTeam == 2 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Green",button.x,button.y)
+				elseif editTeam == 3 then -- 1 = grey, 2 = green, 3 = red
+					love.graphics.print("Red",button.x,button.y)
+				end
+
+			elseif button.name == "PowerSlider" then
+				love.graphics.rectangle('fill',editPower+80,button.y-2,16, button.height-4,button.height/5,button.height/5)
+			else
+				love.graphics.print(button.name,button.x,button.y)
+			end
+		elseif button.shape == "circle" then
+
+			if type(button.name) ~= "string" then
+				teamColours[levelProgress[button.name]][4] = 0.5
+				if not loadMenu then
+					love.graphics.setColor(teamColours[levelProgress[button.name]])
+					love.graphics.circle('fill',button.x,button.y,button.height)
+					--border
+					love.graphics.setColor(1,1,1)
+					love.graphics.circle('line',button.x,button.y,button.height)
+				else
+					--load menu
+					love.graphics.setColor(teamColours[1])
+					love.graphics.circle('fill', button.x,button.y, button.height)
+					--border
+					love.graphics.setColor(1,1,1)
+					love.graphics.circle('line', button.x,button.y, button.height)
+				end
+				
+				love.graphics.setColor(1,1,1)
+				love.graphics.setFont(nodefont38)
+				if loadMenu then 
+					--print(#customLevels)
+					if #customLevels > 1 then
+						love.graphics.printf(string.sub(customLevels[button.name].name,1,1), outerLevelPositions[button.name].x-button.width, outerLevelPositions[button.name].y-16, 2*button.width,'center')
+					end
+				else
+					love.graphics.printf(button.name,button.x-button.width,button.y-16, 2*button.width,'center')
+				end
+				
+				love.graphics.setFont(font14)
+				teamColours[levelProgress[button.name]][4] = 1
+			end
+
+			--black interior before image
+			if button.name == "Menu" or button.name == "Mute" or button.name == "Pause" or button.name == "Reset" then
+				love.graphics.setColor(0,0,0)
+				--border
+				love.graphics.setColor(1,1,1)
+				love.graphics.circle('line',button.x,button.y,button.height)
+			end
+
+			love.graphics.setColor(1,1,1)
+			if button.name == "Menu" then
+				love.graphics.draw(image_QuitMenuButton, button.x-button.width+8, button.y-button.width+8 ,0,0.8,0.8)
+			elseif button.name == "Mute" then
+				love.graphics.draw(image_MuteButton, button.x-button.width+5, button.y-button.width+5 ,0,0.8,0.8)
+			elseif button.name == "Pause" then
+				love.graphics.draw(image_PauseButton, button.x-button.width+8, button.y-button.width+7 ,0,0.8,0.8)
+			elseif button.name == "Reset" then
+				love.graphics.draw(image_ResetButton, button.x-button.width+3, button.y-button.width+4 ,0,0.8,0.8)
+			end
+
+			
+
+		elseif button.shape == "text" then
+			love.graphics.setFont(font30)
+			love.graphics.setColor(1,1,1)
+			love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
+
+		end
+	end
+
+
+	local highlightedButton = isMouseInButton()
+	if highlightedButton > 0 then
+
+		love.graphics.setColor(0.9, 0.9, 0.2, 0.3)
+		if buttonsOnScreen[highlightedButton].shape == "circle" then
+			love.graphics.circle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width)
+			--print(buttonsOnScreen[highlightedButton].x)
+		elseif buttonsOnScreen[highlightedButton].shape == "rectangle" then
+			love.graphics.rectangle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width, buttonsOnScreen[highlightedButton].height,5,5)
+		elseif buttonsOnScreen[highlightedButton].shape == "text" then -- so far just EDITOR button in menu
+			love.graphics.setFont(font30)
+			love.graphics.setColor(0.9, 0.9, 0.2, 0.1)
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x+3, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
+			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y,buttonsOnScreen[highlightedButton].width,'center')
+		end
+	else
+		
+	end
+
+
 	--pause goes on top of everything
 	if pause then
 		--darken everything
@@ -3278,4 +3562,86 @@ function love.draw(mouseX, mouseY)
 		love.graphics.setColor(1,1,1,0.7)
 		love.graphics.printf("Paused", 0, arenaHeight/2-80, arenaWidth , 'center')
 	end
+end
+
+
+function hoverLevelDisplayDRAW(levelIndex)
+	--  customLevelContents, size = love.filesystem.read( 'custom_levels', 50000 ) --should already be updated since getLevelNames() updates it on load button pressed
+
+	--decodeLevelCode(customLevels[levelIndex].startIndex, false)
+
+	--preview display
+
+	--background
+	-- draw a rectangle as a stencil. Each pixel touched by the rectangle will have its stencil value set to 1. The rest will be 0.
+    love.graphics.stencil(previewStencilFunction, "replace", 1)
+
+   -- Only allow rendering on pixels which have a stencil value greater than 0.
+    love.graphics.setStencilTest("greater", 0)
+
+    --love.graphics.setColor(0, 1, 0)
+    --love.graphics.rectangle("fill", arenaWidth/2, arenaHeight/2, 300, 300)
+
+    love.graphics.setColor(0.9, 0.9, 0.9)
+    --love.graphics.draw(game_background,arenaWidth/2-180, arenaHeight/2-140 , 0, 0.3, 0.4)
+    
+
+    love.graphics.setStencilTest()
+	
+
+	-- draw all nodes and population number
+	for nodeIndex, node in ipairs(previewNodes) do
+		-- draw node depending on team colour
+		love.graphics.setColor(teamColours[node.team])
+
+		-- draw node
+		love.graphics.circle('fill', node.x, node.y, node.tier+ nodeCentreRadius/4.7)
+		-- outer node ring
+		if node.tier > 1 then
+			love.graphics.setLineWidth( (node.tier-1)*1.7 )
+			love.graphics.circle('line', node.x, node.y, node.tier+nodeTiers[node.tier].radius/4.7)
+		end
+		-- node border
+		love.graphics.setColor(1, 1, 1)
+		love.graphics.setLineWidth( 1 )
+		love.graphics.circle('line', node.x, node.y, node.tier+nodeCentreRadius/4.7)
+		
+	end
+
+	--draw walls
+	
+	for wallIndex, wall in ipairs(previewWalls) do
+		--border
+		love.graphics.setColor(1,1,1)
+		love.graphics.setLineWidth( 3 )
+		love.graphics.line(wall.startX, wall.startY, wall.endX, wall.endY)
+
+		love.graphics.setColor(0.3,0.3,0.1)
+		love.graphics.setLineWidth( 1 )
+		love.graphics.line(wall.startX, wall.startY, wall.endX, wall.endY)
+	end
+
+	--effect
+	love.graphics.setLineWidth( 8 )
+	love.graphics.setColor(1,1,1,1-(timer%1.5)/1.5)
+	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*(timer%1.5))
+
+	love.graphics.setColor(1,1,1,1-((0.75+timer)%1.5)/1.5)
+	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*((0.75+timer)%1.5))
+
+	--permenant wider circle
+	love.graphics.setColor(1,1,1)
+	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180)
+
+	love.graphics.setColor(0.5, 0.5, 0.5,0.3)
+    love.graphics.circle('fill',arenaWidth/2,arenaHeight/2+50,180)
+
+end
+
+function previewStencilFunction()
+	love.graphics.circle('fill',arenaWidth/2,arenaHeight/2+50,180)
+end
+
+function loadMenuStencilFunction()
+	love.graphics.rectangle('fill', arenaWidth/4.5, arenaHeight/7, arenaWidth*0.555, arenaHeight/1.3, arenaWidth/50, arenaWidth/50)
 end
