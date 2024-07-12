@@ -46,7 +46,7 @@ function love.load()
 	cursor = love.mouse.getSystemCursor("hand")
 
 	currentLevel = 100 -- 0 means menu, 100+ = custom level
-
+	powerLimit = 200
 	timer = 0
 
 	godModeON = false
@@ -107,7 +107,7 @@ function love.load()
 		{
 			x = 50,
 			y = 150,
-			team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+			team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 			population = 180,
 			tier = 1,
 			regenTimer = 5,
@@ -252,20 +252,26 @@ function love.load()
 	teamColours = {
 		{0.7, 0.7, 0.7, 1},
 		{0.1, 0.7, 0.1, 1},
-		{0.7, 0.2, 0.2, 1}
+		{0.7, 0.2, 0.2, 1},
+		{0, 0, 0, 1},
+		{0.7, 0.2, 0.7, 1}
 	}
 
-	darkerTeamColours = {
+	darkerTeamColours = { --not used
 		{0.6, 0.6, 0.6, 1},
 		{0.0, 0.6, 0.0, 1},
-		{0.6, 0.1, 0.1, 1}
+		{0.6, 0.1, 0.1, 1},
+		{0,0,0, 1},
+		{0.5, 0, 0.5, 1}
 	}
 
 	--used in node display
 	nodeDisplayTeamColours = {
 		{1, 1, 0.6, 1},
 		{0.3, 1, 0.3, 1},
-		{1, 0.3, 0.3, 1}
+		{1, 0.3, 0.3, 1},
+		{1, 1, 1, 1}, --white
+		{0.7, 0, 0.7, 1}
 	}
 
 
@@ -285,7 +291,7 @@ function love.load()
 		{name = "Mute", x=95,y=arenaHeight-30, width=20, height=20, shape = "circle" },
 		{name = "Pause", x=150,y=arenaHeight-30, width=20, height=20, shape = "circle" },
 		{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" },   -- circle
-		{name = "God", x=arenaWidth*0.9,y=80, width=50, height=30, shape = "rectangle"},
+		{name = "God", x=arenaWidth*0.7,y=80, width=50, height=30, shape = "rectangle"},
 		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
 		{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
 		{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
@@ -299,9 +305,11 @@ function love.load()
 		{name = "Create Microbe", x=0,y=140, width=260, height=40, shape = "rectangle"}, 
 		{name = "Create Wall", x=0,y=180, width=260, height=40, shape = "rectangle"}, 
 		{name = "Green", x=80,y=200, width=200, height=30, shape = "rectangle"}, 
-		{name = "Red", x=80,y=230, width=200, height=30, shape = "rectangle"}, 
-		{name = "Neutral", x=80,y=260, width=200, height=30, shape = "rectangle"}, 
+		{name = "Red", x=80,y=230, width=200, height=30, shape = "rectangle"},
+		{name = "Black", x=80,y=260, width=200, height=30, shape = "rectangle"}, 
 		--20vv
+		{name = "Purple", x=80,y=290, width=200, height=30, shape = "rectangle"}, 
+		{name = "Neutral", x=80,y=320, width=200, height=30, shape = "rectangle"}, 
 		{name = "Overright", x=arenaWidth*0.8,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
 		{name = "Save As", x=arenaWidth*0.7,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
 		{name = "Load", x=arenaWidth*0.6,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
@@ -323,7 +331,7 @@ function love.load()
 	-- 4 standard and my extra ones -complete, AI, God
 	controlBarButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[5], allButtons[6],allButtons[7]}
 
-	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14], allButtons[20], allButtons[21], allButtons[22] }
+	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14], allButtons[22], allButtons[23], allButtons[24] }
 
 	buttonsOnScreen = { 
 		{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
@@ -580,10 +588,7 @@ function love.update(dt)
 	FPSlogicTimer = FPSlogicTimer + dt
 
 	
-
-
-
-
+	
 	accumulator = accumulator + dt  -- this will balance for lag spikes with a speed up afterwards, theres a check at the end for if the accumulator gets too high causing the game to be superfast for too long
 	if accumulator > 1/FPSlogicTarget then --main program within this if, can only run target
 
@@ -623,16 +628,15 @@ function love.update(dt)
 
 			-- regen
 
-			--node regen timer countdown
-			if not editor then
-				for nodeIndex, node in ipairs(nodes) do
-					if node.team > 1 then
-						node.regenTimer = node.regenTimer - dt
-					end
-					if node.effectTimer > 0 then
-						node.effectTimer = node.effectTimer - dt
-					end
+			--node regen timer and ping effect countdown
+			for nodeIndex, node in ipairs(nodes) do
+				if node.team > 1 and not editor then
+					node.regenTimer = node.regenTimer - dt
 				end
+				if node.effectTimer > 0 then
+					node.effectTimer = node.effectTimer - dt
+				end
+				
 			end
 
 
@@ -659,8 +663,8 @@ function love.update(dt)
 
 				tierChange(node)
 
-				if node.population > 200 then
-					node.population = 200
+				if node.population > powerLimit then
+					node.population = powerLimit
 				elseif node.population < -5 then
 					node.population = 0
 				end
@@ -684,8 +688,8 @@ function love.update(dt)
 				editPower = love.mouse.getX()-88 -- 8 offset to centre the slider itself on the mouse
 				if editPower < 0 then
 					editPower = 0
-				elseif editPower > 200 then
-					editPower = 200
+				elseif editPower > powerLimit then
+					editPower = powerLimit
 				end
 				if editorSelected.index > 0 and editorSelected.node then
 					if nodes[editorSelected.index].team > 1 then
@@ -1032,7 +1036,7 @@ function glowDelivery()
 							nodes[connection.target].population = nodes[connection.target].population - 1
 						end
 					else
-						if nodes[connection.target].population < 200 then
+						if nodes[connection.target].population < powerLimit then
 							nodes[connection.target].population = nodes[connection.target].population + 1
 						end
 					end
@@ -1426,7 +1430,7 @@ function love.mousereleased(mouseX, mouseY)
 	and nodeSelected ~= releasenode   -- means not equal
 	and nodes[nodeSelected].population > 0
 	and nodes[nodeSelected].tentaclesUsed < nodeTiers[nodes[nodeSelected].tier].maxTentacles
-	and (nodes[nodeSelected].team == 2 or godModeON)
+	and (nodes[nodeSelected].team == 2 or godModeON) -- only control green nodes unless god mode is on
 	then
 		-- check for wall intersection
 		local wallIntersection = false
@@ -1542,7 +1546,7 @@ function love.mousepressed(mouseX, mouseY)
 
 		local wallSelected = isMouseInWall()
 
-		if nodeSelected < 1 and buttonSelected < 1 and wallSelected < 1 then
+		if nodeSelected < 1 and buttonSelected < 1 and (wallSelected < 1 or not editor) then
 			--nothing selected
 
 			--point selected for making cuts
@@ -1555,7 +1559,7 @@ function love.mousepressed(mouseX, mouseY)
 					if editTeam > 1 then
 						table.insert(nodes, {x = mouseX,
 							y = mouseY,
-							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 							population = editPower,
 							tier = 3,
 							regenTimer = 5,
@@ -1567,7 +1571,7 @@ function love.mousepressed(mouseX, mouseY)
 					else
 						table.insert(nodes, {x = mouseX,
 							y = mouseY,
-							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 							population = 0,
 							tier = 3,
 							regenTimer = 5,
@@ -1666,7 +1670,10 @@ function love.mousepressed(mouseX, mouseY)
 					for b = 1, #controlBarButtons do
 						table.insert(buttonsOnScreen, controlBarButtons[b])
 					end	
+					timer = 0
 				end
+
+
 
 			elseif buttonsOnScreen[buttonSelected].name == "Menu" then
 				for i = 3 , #menuButtons do
@@ -1720,7 +1727,7 @@ function love.mousepressed(mouseX, mouseY)
 						node.tentaclesUsed = 0
 					end
 				end
-
+				timer = 0
 				calculateNodeDistances() -- necessary?
 
 			elseif buttonsOnScreen[buttonSelected].name == "Pause" then
@@ -1786,7 +1793,7 @@ function love.mousepressed(mouseX, mouseY)
 					buttonsOnScreen = controlBarButtons
 					table.insert(buttonsOnScreen, allButtons[14])
 
-					
+					timer = 0
 				end
 				
 				print("TESTING, Testing the edit")
@@ -1842,7 +1849,7 @@ function love.mousepressed(mouseX, mouseY)
 			elseif buttonsOnScreen[buttonSelected].name == "MicrobeTeam" then
 				local existsAlready = false
 				for b = #buttonsOnScreen, 1, -1 do
-					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
 						table.remove(buttonsOnScreen, b)
 						existsAlready = true
 					end
@@ -1852,12 +1859,14 @@ function love.mousepressed(mouseX, mouseY)
 					table.insert(buttonsOnScreen, allButtons[17])
 					table.insert(buttonsOnScreen, allButtons[18])
 					table.insert(buttonsOnScreen, allButtons[19])
+					table.insert(buttonsOnScreen, allButtons[20])
+					table.insert(buttonsOnScreen, allButtons[21])
 				end
 
 			elseif buttonsOnScreen[buttonSelected].name == "Green" then
 				editTeam = 2
 				for b = #buttonsOnScreen, 1, -1 do
-					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
 						table.remove(buttonsOnScreen, b)
 					end
 				end
@@ -1876,7 +1885,43 @@ function love.mousepressed(mouseX, mouseY)
 			elseif buttonsOnScreen[buttonSelected].name == "Red" then
 				editTeam = 3
 				for b = #buttonsOnScreen, 1, -1 do
-					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+				if editorSelected.node and #nodes > 0 then
+					if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+						nodes[editorSelected.index].population = editPower
+					elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+						nodes[editorSelected.index].population = 0
+						nodes[editorSelected.index].neutralPower = editPower
+					end
+
+					nodes[editorSelected.index].team = editTeam
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Black" then
+				editTeam = 4
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
+						table.remove(buttonsOnScreen, b)
+					end
+				end
+				if editorSelected.node and #nodes > 0 then
+					if nodes[editorSelected.index].team == 1 and editTeam ~= 1 then
+						nodes[editorSelected.index].population = editPower
+					elseif nodes[editorSelected.index].team ~= 1 and editTeam == 1 then
+						nodes[editorSelected.index].population = 0
+						nodes[editorSelected.index].neutralPower = editPower
+					end
+
+					nodes[editorSelected.index].team = editTeam
+				end
+
+			elseif buttonsOnScreen[buttonSelected].name == "Purple" then
+				editTeam = 5
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
 						table.remove(buttonsOnScreen, b)
 					end
 				end
@@ -1894,7 +1939,7 @@ function love.mousepressed(mouseX, mouseY)
 			elseif buttonsOnScreen[buttonSelected].name == "Neutral" then
 				editTeam = 1
 				for b = #buttonsOnScreen, 1, -1 do
-					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" then
+					if buttonsOnScreen[b].name == "Green" or buttonsOnScreen[b].name == "Red" or buttonsOnScreen[b].name == "Neutral" or buttonsOnScreen[b].name == "Black" or buttonsOnScreen[b].name == "Purple" then
 						table.remove(buttonsOnScreen, b)
 					end
 				end
@@ -1924,9 +1969,9 @@ function love.mousepressed(mouseX, mouseY)
 
 			elseif buttonsOnScreen[buttonSelected].name == "Save As" then 
 
-				exportLevel()
+				exportLevel()	--temporary for level making. uncomment the below to change back to normal Save As function
 
-				--table.insert(buttonsOnScreen, allButtons[23])
+				--table.insert(buttonsOnScreen, allButtons[25])
 				--saveMenu = true
 				--editor = false
 				
@@ -1940,7 +1985,7 @@ function love.mousepressed(mouseX, mouseY)
 				end
 
 
-				--table.insert(buttonsOnScreen, allButtons[23])
+				--table.insert(buttonsOnScreen, allButtons[25])
 				loadMenu = true
 				editor = false
 
@@ -1995,7 +2040,7 @@ function createLevelCode()
 
 	--[[		x = arenaWidth / 2,
 		        y = arenaHeight / 2,
-		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 		        population = 60,
 		        tier = 3,
 		        regenTimer = 5,
@@ -2210,7 +2255,7 @@ function exportLevel()
 	{
 		        x = arenaWidth / 2 -150,
 		        y = arenaHeight / 3,
-		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red
+		        team = 2,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 		        population = 10,
 		        tier = 1,
 		        regenTimer = 5,
@@ -2492,7 +2537,7 @@ function love.draw(mouseX, mouseY)
 
 	end
 
-	love.graphics.print("hi", 200,200)
+	--love.graphics.print("hi", 200,200)
 
 	--menu
 	if current_background == menu_background then
@@ -2615,7 +2660,9 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 60)
 
-	love.graphics.print("Zone: ".. currentLevel, 150,90)
+	love.graphics.print("Zone: ".. currentLevel, 150,30)
+	love.graphics.print("POWER LIMIT: ".. powerLimit, 250,30)
+	love.graphics.print("TIME: ".. math.floor(timer), arenaWidth-150,100)
 
 	love.graphics.print("buttons On Screen: " .. #buttonsOnScreen, 250,90)
 	love.graphics.print("editor: " .. tostring(editor), 430,90)
@@ -2623,15 +2670,16 @@ function love.draw(mouseX, mouseY)
 
 
 	--draw total power ratio bar
-	local totalTeamPowers = {0,0,0}
+	local totalTeamPowers = {0,0,0,0,0}
 	local totalPower = 0
+	--count power
 	for nodeIndex, node in ipairs(nodes) do
 		if node.team > 1 then
 			totalTeamPowers[node.team] = totalTeamPowers[node.team] + node.population
 			totalPower = totalPower + node.population
 		end
 	end
-
+	--display power bar
 	local powerProgress = 0
 	for team, teamPower in ipairs(totalTeamPowers) do
 		love.graphics.setColor(teamColours[team])
@@ -2852,6 +2900,11 @@ function love.draw(mouseX, mouseY)
 
 	-- draw all nodes and population number
 	for nodeIndex, node in ipairs(nodes) do
+
+		--background
+		love.graphics.setColor(0.5, 0.5, 0.5, 0.5)
+		love.graphics.circle('fill', node.x, node.y, nodeTiers[node.tier].radius)
+
 		-- draw node depending on team colour
 		love.graphics.setColor(teamColours[node.team])
 		--darken the colour when weak
@@ -2863,7 +2916,7 @@ function love.draw(mouseX, mouseY)
 			love.graphics.setColor(weakColour)
 		end
 		-- draw node
-		--print(node.x, node.y)
+		--centre
 		love.graphics.circle('fill', node.x, node.y, nodeCentreRadius)
 		-- node border
 		love.graphics.setColor(1, 1, 1)
@@ -3438,12 +3491,16 @@ function love.draw(mouseX, mouseY)
 				end
 
 			elseif button.name == "MicrobeTeam" then
-				if editTeam == 1 then -- 1 = grey, 2 = green, 3 = red
+				if editTeam == 1 then -- 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 					love.graphics.print("Neutral",button.x,button.y)
-				elseif editTeam == 2 then -- 1 = grey, 2 = green, 3 = red
+				elseif editTeam == 2 then -- 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 					love.graphics.print("Green",button.x,button.y)
-				elseif editTeam == 3 then -- 1 = grey, 2 = green, 3 = red
+				elseif editTeam == 3 then -- 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
 					love.graphics.print("Red",button.x,button.y)
+				elseif editTeam == 4 then -- 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
+					love.graphics.print("Black",button.x,button.y)
+				elseif editTeam == 5 then -- 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
+					love.graphics.print("Purple",button.x,button.y)
 				end
 
 			elseif button.name == "PowerSlider" then
