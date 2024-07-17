@@ -34,6 +34,7 @@ function love.load()
 	customLevels = {}
 	loadMenu = false
 	saveMenu = false
+	levelDoneMenu = false
 
 	error = {status = false, message = "no error yet"}
 	
@@ -72,6 +73,7 @@ function love.load()
 	nodefont27 = love.graphics.newFont('Fonts/editundo.ttf', 27, 'none',1)
 	nodefont38 = love.graphics.newFont('Fonts/editundo.ttf', 38, 'none',1)
 	titlefont = love.graphics.newFont('Fonts/Pulp Fiction M54.ttf', 120, 'none',1)
+	levelDonefont = love.graphics.newFont('Fonts/Pulp Fiction M54.ttf', 50, 'none',1)
 	monofont = love.graphics.newFont('Fonts/PWTHMSEG.ttf', 19, 'none',1)
 	font21 = love.graphics.newFont(21)
 	font30 = love.graphics.newFont(30)
@@ -293,8 +295,8 @@ function love.load()
 		{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" },   -- circle
 		{name = "God", x=arenaWidth*0.7,y=80, width=50, height=30, shape = "rectangle"},
 		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
-		{name = "Complete", x=10, y=30, width=80, height=30, shape = "rectangle"},
-		{name = "Unlock", x=100, y=30, width=80, height=30, shape = "rectangle"},
+		{name = "Complete", x=arenaWidth*0.5, y=20, width=80, height=30, shape = "rectangle"},
+		{name = "Unlock", x=arenaWidth*0.5, y=20, width=80, height=30, shape = "rectangle"},
 		{name = "Editor", x=arenaWidth/2-60,y=arenaHeight/2, width=130, height=33, shape = "text"}, 
 		--10 vv
 		{name = "CreateX", x=2,y=2, width=256, height=60, shape = "rectangle"}, 
@@ -313,7 +315,9 @@ function love.load()
 		{name = "Overright", x=arenaWidth*0.8,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
 		{name = "Save As", x=arenaWidth*0.7,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
 		{name = "Load", x=arenaWidth*0.6,y=arenaHeight-30, width=50, height=30, shape = "rectangle"},
-		{name = "Confirm", x=arenaWidth*0.4,y=arenaHeight*0.4, width=50, height=30, shape = "rectangle"},  
+		{name = "Confirm", x=arenaWidth*0.4,y=arenaHeight*0.4, width=50, height=30, shape = "rectangle"}, 
+		{name = "Menu", x=arenaWidth/2-35,y=arenaHeight/1.85, width=70, height=33, shape = "text"}, 
+		{name = "Continue", x=arenaWidth/2-60,y=arenaHeight/1.7, width=120, height=33, shape = "text"},  
 
 		{name = 1, x= arenaWidth/2+330*(math.sin(2*math.pi*0/20)),  y= arenaHeight/2+50-330*(math.cos(2*math.pi*0/20)), width=35, height=35, shape = "circle"}
 	}
@@ -331,7 +335,7 @@ function love.load()
 	-- 4 standard and my extra ones -complete, AI, God
 	controlBarButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[5], allButtons[6],allButtons[7]}
 
-	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10],allButtons[11], allButtons[12],allButtons[13], allButtons[14], allButtons[22], allButtons[23], allButtons[24] }
+	editorButtons = {allButtons[1], allButtons[2], allButtons[3],allButtons[4], allButtons[10], allButtons[14], allButtons[22], allButtons[23], allButtons[24] } --allButtons[11], allButtons[12],allButtons[13],
 
 	buttonsOnScreen = { 
 		{name = "Menu", x=40,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
@@ -340,7 +344,7 @@ function love.load()
 		{name = "Reset", x=205,y=arenaHeight-30, width=20, height=20, shape = "circle" }, 
 		{name = "God", x=arenaWidth*0.7,y=30, width=50, height=30, shape = "rectangle"}, 
 		{name = "AI", x=arenaWidth*0.8,y=80, width=50, height=30, shape = "rectangle"},
-		{name = "Complete", x=10,y=30, width=80, height=30, shape = "rectangle"} 
+		{name = "Complete", x=arenaWidth*0.5, y=20, width=80, height=30, shape = "rectangle"} 
 	}
 
 	outerLevelPositions = {}
@@ -579,8 +583,11 @@ end
 
 function love.update(dt)
 
-	  -- trying to force a locked logic rate e.g. 120 updates per second, as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things like tentacles to move faster. tricky
-	timer = timer + dt
+	 -- trying to force a locked logic rate e.g. 120 updates per second, as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things like tentacles to move faster. tricky
+	if not levelDoneMenu then
+		timer = timer + dt
+	end
+
 	if FPSlogicTimer > 1 then
 		FPSlogicTimer = 0
 		tickCount = 0
@@ -728,6 +735,10 @@ function love.update(dt)
 
 			nodeRepulsion()
 
+			if levelDoneMenu == false and not editor and not saveMenu and not loadMenu then
+				checklevelDone()
+			end
+
 			if editor then
 				love.keyboard.setTextInput( true )
 			else
@@ -736,7 +747,7 @@ function love.update(dt)
 			
 			updateMovingConnections() --main update processes
 
-			if AION and not editor then	--ie AI ON
+			if AION and not editor and timer > 5 then	--ie AI ON
 				enemyAI()
 			end
 
@@ -750,11 +761,54 @@ function love.update(dt)
 
 
 		accumulator = accumulator - 1/FPSlogicTarget
+		if FPSlogicActual < FPSlogicTarget and timer > 5 then
+			if love.timer.getFPS( ) > FPSlogicTarget/2 and love.timer.getFPS( ) < FPSlogicTarget and FPSlogicTarget > 20 then
+				FPSlogicTarget = FPSlogicTarget/2
+			end
+		elseif love.timer.getFPS( ) >= FPSlogicTarget and timer % 10 < 0.2 and FPSlogicTarget < 90 then
+			FPSlogicTarget = FPSlogicTarget *2
+		end
 
 		if accumulator > 1 then		--limit catchup
 			accumulator = 1
 		end
 	end
+end
+
+function checklevelDone()
+
+	local playerXEnemy = { 0,0 }
+	local counter = 1
+	--count all node teams
+	while counter <= #nodes and (playerXEnemy[1] < 1 or playerXEnemy[2] < 1) do
+		if nodes[counter].team > 2 then
+			playerXEnemy[2] = playerXEnemy[2] + 1
+		elseif nodes[counter].team == 2 then
+			playerXEnemy[1] = playerXEnemy[1] + 1
+		end
+		counter = counter + 1
+	end
+	if playerXEnemy[1] < 1 or playerXEnemy[2] < 1 then
+		-- mark level completed
+		if playerXEnemy[2] < 1 then
+			levelProgress[currentLevel] = 2
+			--unlocks next level
+			if levelProgress[currentLevel+1] == 3 then
+				levelProgress[currentLevel+1] = 1
+				menuButtons[#menuButtons-20+currentLevel+1].x = outerLevelPositions[currentLevel+1].x
+				menuButtons[#menuButtons-20+currentLevel+1].y = outerLevelPositions[currentLevel+1].y
+			end
+			
+
+		end
+
+		table.insert(buttonsOnScreen, allButtons[26])
+		table.insert(buttonsOnScreen, allButtons[27])
+		
+
+		levelDoneMenu = true
+	end
+
 end
 
 function tierChange(node)
@@ -791,8 +845,8 @@ function updateMovingConnections()
 			-- breaking a connection
 			if connection.destination == 0 then 
 				for linkIndex, link in ipairs(connection.links) do
-					link.x = link.x - (connection.linkXStep/7)
-					link.y = link.y - (connection.linkYStep/7)
+					link.x = link.x - (connection.linkXStep/7*160/FPSlogicTarget)
+					link.y = link.y - (connection.linkYStep/7*160/FPSlogicTarget)
 					if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 						table.remove(connection.links, linkIndex)
 						nodes[connection.source].population = nodes[connection.source].population + 1
@@ -818,8 +872,8 @@ function updateMovingConnections()
 						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 20 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
 						-- touching
 						for linkIndex, link in ipairs(connection.links) do
-							link.x = link.x - (connection.linkXStep/20) -- back
-							link.y = link.y - (connection.linkYStep/20)
+							link.x = link.x - (connection.linkXStep/20*160/FPSlogicTarget) -- back
+							link.y = link.y - (connection.linkYStep/20*160/FPSlogicTarget)
 
 							if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 								table.remove(connection.links, linkIndex)
@@ -832,8 +886,8 @@ function updateMovingConnections()
 						-- not touching
 						-- keep moving but check if touching
 						for linkIndex, link in ipairs(connection.links) do
-							link.x = link.x + (connection.linkXStep/20)
-							link.y = link.y + (connection.linkYStep/20)
+							link.x = link.x + (connection.linkXStep/20*160/FPSlogicTarget)
+							link.y = link.y + (connection.linkYStep/20*160/FPSlogicTarget)
 
 								-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
 							if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeTiers[nodes[connection.source].tier].radius-linkRadius then
@@ -858,8 +912,8 @@ function updateMovingConnections()
 					end
 					-- keep moving either way
 					for linkIndex, link in ipairs(connection.links) do
-						link.x = link.x + (connection.linkXStep/20)
-						link.y = link.y + (connection.linkYStep/20)
+						link.x = link.x + (connection.linkXStep/20*160/FPSlogicTarget)
+						link.y = link.y + (connection.linkYStep/20*160/FPSlogicTarget)
 
 						-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
 						if (distancebetween(connection.links[#connection.links].x - (connection.linkXStep), connection.links[#connection.links].y - (connection.linkYStep), nodes[connection.source].x, nodes[connection.source].y)) > nodeTiers[nodes[connection.source].tier].radius-linkRadius then
@@ -887,8 +941,8 @@ function updateMovingConnections()
 			-- moving a connection to target 
 			elseif connection.destination == 2 then
 				for linkIndex, link in ipairs(connection.links) do
-					link.x = link.x + (connection.linkXStep/20)
-					link.y = link.y + (connection.linkYStep/20)
+					link.x = link.x + (connection.linkXStep/20*160/FPSlogicTarget)
+					link.y = link.y + (connection.linkYStep/20*160/FPSlogicTarget)
 				end
 
 				-- compare distance of potential link location to node centre vs node radius. i.e. if potential link is within radius
@@ -911,15 +965,15 @@ function updateMovingConnections()
 			elseif connection.destination == 3 then
 				for linkIndex, link in ipairs(connection.links) do
 					if linkIndex > connection.splitLink then --send to source
-						link.x = link.x - (connection.linkXStep/7)
-						link.y = link.y - (connection.linkYStep/7)
+						link.x = link.x - (connection.linkXStep/7*160/FPSlogicTarget)
+						link.y = link.y - (connection.linkYStep/7*160/FPSlogicTarget)
 						if distancebetween(link.x, link.y, nodes[connection.source].x, nodes[connection.source].y) < nodeTiers[nodes[connection.source].tier].radius-linkRadius then
 							table.remove(connection.links, linkIndex)
 							nodes[connection.source].population = nodes[connection.source].population + 1
 						end
 					else --send to target
-						link.x = link.x + (connection.linkXStep/7)
-						link.y = link.y + (connection.linkYStep/7)
+						link.x = link.x + (connection.linkXStep/7*160/FPSlogicTarget)
+						link.y = link.y + (connection.linkYStep/7*160/FPSlogicTarget)
 						if distancebetween(link.x, link.y, nodes[connection.target].x, nodes[connection.target].y) < nodeTiers[nodes[connection.target].tier].radius-linkRadius then
 							table.remove(connection.links, linkIndex)
 							connection.splitLink = connection.splitLink -1
@@ -1585,6 +1639,9 @@ function love.mousepressed(mouseX, mouseY)
 					nodeSelected = isMouseInNode()
 					editorSelected.node = true
 					editorSelected.index = #nodes
+					for b = 11, 13 do
+						table.insert(buttonsOnScreen, allButtons[b])
+					end	
 				else
 					--create wall
 					table.insert(walls, {
@@ -1595,6 +1652,7 @@ function love.mousepressed(mouseX, mouseY)
 			    	})
 			    	editorSelected.node = false
 					editorSelected.index = #walls
+					table.insert(buttonsOnScreen, allButtons[13])
 				end
 
 			end
@@ -1604,7 +1662,20 @@ function love.mousepressed(mouseX, mouseY)
 
 			if editor then
 				editorSelected.node = true
-				editorSelected.index = nodeSelected
+				editorSelected.index = nodeSelected  
+
+				local existsAlready = false
+				for b = #buttonsOnScreen, 1, -1 do
+					if buttonsOnScreen[b].name == "Create Wall" or buttonsOnScreen[b].name == "Create Microbe" then
+						table.remove(buttonsOnScreen, b)
+						existsAlready = true
+					end
+				end
+				if existsAlready == false then
+					table.insert(buttonsOnScreen, allButtons[15])
+					table.insert(buttonsOnScreen, allButtons[16])
+				end
+
 				if nodes[nodeSelected].team ~= 1 then
 					editPower = nodes[nodeSelected].population
 				else
@@ -1676,6 +1747,7 @@ function love.mousepressed(mouseX, mouseY)
 
 
 			elseif buttonsOnScreen[buttonSelected].name == "Menu" then
+				levelDoneMenu = false
 				for i = 3 , #menuButtons do
 					if levelProgress[i-2] == 3 then --locked
 						menuButtons[i].x = innerLevelPositions[i-2].x
@@ -1702,6 +1774,29 @@ function love.mousepressed(mouseX, mouseY)
 					table.insert(buttonsOnScreen, menuButtons[b])
 				end
 				--print("buttons on screen: ", #buttonsOnScreen)
+
+			elseif buttonsOnScreen[buttonSelected].name == "Continue" then
+				levelDoneMenu = false
+
+				if currentLevel < 20 then
+					--next level 
+					connections = {}
+					levelNodesTable = levelNodes(arenaWidth,arenaHeight) -- refresh table to re-set populations back to default
+					currentLevel = currentLevel + 1
+					current_background = game_background
+					nodes = levelNodesTable[currentLevel] 
+					walls = levelWallsTable[currentLevel] 
+
+					calculateNodeDistances()
+
+					buttonsOnScreen = {}
+
+					for b = 1, #controlBarButtons do
+						table.insert(buttonsOnScreen, controlBarButtons[b])
+					end	
+					timer = 0
+				end
+
 
 			elseif buttonsOnScreen[buttonSelected].name == "God" then
 				godModeON = not godModeON
@@ -2660,9 +2755,13 @@ function love.draw(mouseX, mouseY)
 
 	love.graphics.print(string.format("Average frame time: %.3f ms", 1000 * love.timer.getAverageDelta()), 420, 60)
 
-	love.graphics.print("Zone: ".. currentLevel, 150,30)
-	love.graphics.print("POWER LIMIT: ".. powerLimit, 250,30)
-	love.graphics.print("TIME: ".. math.floor(timer), arenaWidth-150,100)
+	love.graphics.setFont(font21)
+
+	love.graphics.print("ZONE: ".. currentLevel, 20,20)
+	love.graphics.print("POWER LIMIT: ".. powerLimit, 160,20)
+	love.graphics.print("TIME: ".. math.floor(timer), arenaWidth-170,70)
+
+	love.graphics.setFont(font14)
 
 	love.graphics.print("buttons On Screen: " .. #buttonsOnScreen, 250,90)
 	love.graphics.print("editor: " .. tostring(editor), 430,90)
@@ -3224,11 +3323,11 @@ function love.draw(mouseX, mouseY)
 
 
 	
-	-- draw line between mouse and NODE after node selected, before release
+	-- draw arrow line between mouse and NODE after node selected, before release
 	love.graphics.setColor(0.8, 0.8, 0)
 	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
-		if (editor == false) then
+		if editor == false or levelDoneMenu == false then
 			if nodeSelected > 0  and (nodes[nodeSelected].team == 2 or godModeON) then -- and pointSelected.x == 0
 				love.graphics.setColor(0.8, 0.8, 0)
 				love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
@@ -3240,7 +3339,7 @@ function love.draw(mouseX, mouseY)
 				love.graphics.translate(love.mouse.getX(), love.mouse.getY())
 				love.graphics.rotate(-angle)
 
-				love.graphics.line(0, 0,0,50)
+				--love.graphics.line(0, 0,0,50) --perpendicular line
 
 				love.graphics.line(0,0,-10,10)
 				love.graphics.circle('fill',-10,10,2.5)
@@ -3273,7 +3372,7 @@ function love.draw(mouseX, mouseY)
 	end
 
 	--hover node display
-	if not editor and not saveMenu and not loadMenu then
+	if not editor and not saveMenu and not loadMenu and not levelDoneMenu then
 		local mouseNode = isMouseInNode()
 		if mouseNode > 0 then
 			local Xshift = 0
@@ -3454,12 +3553,45 @@ function love.draw(mouseX, mouseY)
 			previewWalls = {}
 		end
 
+	elseif levelDoneMenu then
+		--menu background square
+		love.graphics.setColor(0.1,0.15,0.15)
+		love.graphics.rectangle('fill', arenaWidth/3, arenaHeight/3, arenaWidth/3 , arenaHeight/3)
+		--border
+		love.graphics.setLineWidth( 1 )
+		love.graphics.setColor(0.5,0.5,0.5)
+		love.graphics.rectangle('line', arenaWidth/3, arenaHeight/3, arenaWidth/3 , arenaHeight/3)
+		local Win = nil
+		local counter = 1
+		while Win == nil do 
+			if nodes[counter].team == 2 then
+				Win = true
+			elseif nodes[counter].team > 2 then
+				Win = false
+			end
+			counter = counter + 1
+		end
 
+		love.graphics.setFont(levelDonefont)
+		if Win then
+			love.graphics.setColor(nodeDisplayTeamColours[2])
+			love.graphics.printf("ZONE  OCCUPIED", arenaWidth*0.3, arenaHeight/2.6, arenaWidth*0.4 , 'center')
+		else
+			love.graphics.setColor(nodeDisplayTeamColours[3])
+			love.graphics.printf("EXTERMINATION", arenaWidth*0.3, arenaHeight/2.6, arenaWidth*0.4 , 'center')
+		end
+		love.graphics.setFont(font21)
+		love.graphics.setColor(nodeDisplayTeamColours[1])
+
+		love.graphics.printf("TIME: " .. math.ceil(timer) .. " 		SCORE: " .. 1000 - math.ceil(timer * 20), arenaWidth*0.3, arenaHeight/2.1, arenaWidth*0.4 , 'center')
+		--love.graphics.printf("Score: " .. 1000 - (timer * 20), arenaWidth*0.3, arenaHeight/3.5, arenaWidth*0.4 , 'center')
+
+		love.graphics.setFont(font14)
 	end
 
 	--draw buttons
 	for buttonIndex, button in ipairs(buttonsOnScreen) do
-		love.graphics.printf(button.name,button.x+button.width,button.y-16, 2*button.width,'center')
+		--love.graphics.printf(button.name,button.x+button.width,button.y-16, 2*button.width,'center')	--display button name beside every button
 
 		love.graphics.setColor(0.3,0.3,0.3)
 		if button.name == "God" then
@@ -3564,9 +3696,16 @@ function love.draw(mouseX, mouseY)
 			
 
 		elseif button.shape == "text" then
-			love.graphics.setFont(font30)
-			love.graphics.setColor(1,1,1)
-			love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
+			if button.name == "Editor" then
+				love.graphics.setFont(font30)
+				love.graphics.setColor(1,1,1)
+				love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
+			else
+				love.graphics.setFont(font21)
+				love.graphics.setColor(1,1,1)
+				love.graphics.printf(string.upper(button.name),button.x,button.y,button.width,'center')
+
+			end
 
 		end
 	end
@@ -3582,7 +3721,11 @@ function love.draw(mouseX, mouseY)
 		elseif buttonsOnScreen[highlightedButton].shape == "rectangle" then
 			love.graphics.rectangle('fill', buttonsOnScreen[highlightedButton].x, buttonsOnScreen[highlightedButton].y, buttonsOnScreen[highlightedButton].width, buttonsOnScreen[highlightedButton].height,5,5)
 		elseif buttonsOnScreen[highlightedButton].shape == "text" then -- so far just EDITOR button in menu
-			love.graphics.setFont(font30)
+			if buttonsOnScreen[highlightedButton].name == "Editor" then
+				love.graphics.setFont(font30)
+			else
+				love.graphics.setFont(font21)
+			end
 			love.graphics.setColor(0.9, 0.9, 0.2, 0.1)
 			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y-3,buttonsOnScreen[highlightedButton].width,'center')
 			love.graphics.printf(string.upper(buttonsOnScreen[highlightedButton].name), buttonsOnScreen[highlightedButton].x-3, buttonsOnScreen[highlightedButton].y+3,buttonsOnScreen[highlightedButton].width,'center')

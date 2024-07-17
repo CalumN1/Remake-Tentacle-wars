@@ -4,15 +4,13 @@ To Do List
 
 -	fix feelers to arc correctly
 
--	find solution for if the game cant guarantee 160 logic updates per second as tentacle speed is dependant on logic updates per second
-
 -	adjust delivery speeds
 
 - 	use points to add more effects e.g. circling tentacles or nodes
 
 -	other AI Improvements?
 
-	-	slow down enemy AI ? a bit more maybe? -add a decision timer and only act when it reaches 0, starting even at 10 seconds? purple could be lower too
+	-	slow down enemy AI -add a decision timer and only act when it reaches 0, starting even at 10 seconds? purple could be lower too
 
 	-	make AI oppose when attacked
 
@@ -22,19 +20,16 @@ To Do List
 
 	-	make AI go for the best option when given many possible options e.g. if powerful, not just the first checked options e.g. furthest away node
 
-- 	add upto level 10
-
 -	add upto level 15
 
 -	add upto level 20
 
--	add level complete menu
-
-- 	add timer
-
 -	add scoring, only based on timer? or 
 
--	add power limits?
+-	add power limits to levels
+
+-	add power limits to editor
+	-	and to level saving
 
 -	pause when window in background?
 

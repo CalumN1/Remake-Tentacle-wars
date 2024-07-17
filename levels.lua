@@ -323,7 +323,7 @@ function levelNodes(arenaWidth,arenaHeight)
 				y =  0.38981481481481*arenaHeight,
 				team =  2,
 				population =  10,
-				tier =  2,
+				tier =  1,
 				regenTimer = 2.4, 
 				tentaclesUsed = 0,
 				effectTimer = 0,
@@ -335,7 +335,7 @@ function levelNodes(arenaWidth,arenaHeight)
 				y =  0.39351851851852*arenaHeight,
 				team =  2,
 				population =  10,
-				tier =  2,
+				tier =  1,
 				regenTimer = 2.4, 
 				tentaclesUsed = 0,
 				effectTimer = 0,
@@ -345,13 +345,13 @@ function levelNodes(arenaWidth,arenaHeight)
 			{ 
 				x = 0.31319444444444*arenaWidth,
 				y =  0.74351851851852*arenaHeight,
-				team =  2,
-				population =  10,
-				tier =  2,
-				regenTimer = 2.4, 
+				team =  1,
+				population =  0,
+				tier =  1,
+				regenTimer = 2, 
 				tentaclesUsed = 0,
 				effectTimer = 0,
-				neutralPower = 6,
+				neutralPower = 10,
 				neutralTeam =  1
 			},
 			{ 
@@ -364,7 +364,7 @@ function levelNodes(arenaWidth,arenaHeight)
 				tentaclesUsed = 0,
 				effectTimer = 0,
 				neutralPower = 10,
-				neutralTeam =  3
+				neutralTeam =  1
 			},
 			{ 
 				x = 0.48819444444444*arenaWidth,
