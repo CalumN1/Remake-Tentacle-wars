@@ -572,7 +572,7 @@ function calculateNodeEdges(sourceNode, targetNode)
 
 
 
-	print("targetX: ",targetX, "   targetY: ", targetY)
+	--print("targetX: ",targetX, "   targetY: ", targetY)
 
 	return {sourceX = sourceX, sourceY = sourceY, targetX = targetX, targetY = targetY}
 
@@ -747,7 +747,7 @@ function love.update(dt)
 			
 			updateMovingConnections() --main update processes
 
-			if AION and not editor and timer > 5 then	--ie AI ON
+			if AION and not editor and timer > 5  and (timer-0.3) % 4.8  < 1/FPSlogicTarget then	--ie AI ON
 				enemyAI()
 			end
 
@@ -1106,14 +1106,14 @@ function glowDelivery()
 							-- if dead node has other tentacles out, retract them
 							for connectionIndex2, connection2 in ipairs(connections) do
 								if connection2.source == connection.target then
-									connection2.destination = 0
-									connection2.moving = true
 									if connection2.opposedConnectionIndex > 0 then
 										connections[connection2.opposedConnectionIndex].opposedConnectionIndex = 0
 										connections[connection2.opposedConnectionIndex].moving = true
 										connections[connection2.opposedConnectionIndex].destination = 2
 									end
 									connection2.opposedConnectionIndex = 0
+									connection2.destination = 0
+									connection2.moving = true
 								end
 							end
 						else
@@ -1542,9 +1542,9 @@ function cutConnection(connectionIndex, connection, ix, iy)
 		connection.destination = 0
 		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
 		if connection.opposedConnectionIndex > 0 then
-			connections[connection.opposedConnectionIndex].moving = true
-			connections[connection.opposedConnectionIndex].destination = 2
 			connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0 
+			connections[connection.opposedConnectionIndex].destination = 2
+			connections[connection.opposedConnectionIndex].moving = true
 			connection.opposedConnectionIndex = 0
 			--print(connectionIndex, connection.opposedConnectionIndex)
 		end
@@ -2457,11 +2457,28 @@ function enemyAI()
 	--	print(#nodeDistances[c])
 	--end
 
+	--only make 1 action per call (for each enemy)
+	local actionTaken = {false, false, false }
 
-	for nodeIndex, node in ipairs(nodes) do
+	local randomizer = math.floor(love.math.random(0, (#nodes-0.1) ) )
+	print("AI could do something?")
+	for counter = 1, #nodes do
+		local nodeIndex = counter + randomizer
+		
+
+		if nodeIndex > #nodes then
+			nodeIndex = nodeIndex - (#nodes)  -- 7 -> 1
+		end
+		
+		
+		local node = nodes[nodeIndex]
+		--print(counter, nodeIndex, #nodes)
+
+	
 		if nodeIndex ~= 9 then	--waht? why?
 			--only act for enemy nodes
-			if node.team > 2 then 
+			if node.team > 2 and actionTaken[node.team-2] ~= true then 
+
 				--only consider creating new tentacles for nodes with spare tentacles
 				if node.tentaclesUsed < nodeTiers[node.tier].maxTentacles then
 					--loop through each potential target node from closest to furthest away
@@ -2508,6 +2525,8 @@ function enemyAI()
 									--create connection
 									--print(targetNodeAndDistance[1])
 									createConnection(nodeIndex, targetNodeAndDistance[1])
+									actionTaken[node.team-2] = true
+									print("AI doing a thing")
 									--print("break!")
 									break
 								end
@@ -2530,7 +2549,8 @@ function enemyAI()
 							ix, iy = connection.sourceEdge.x, connection.sourceEdge.y
 
 							cutConnection(connectionIndex, connection, ix, iy)
-
+							actionTaken[node.team-2] = true
+							print("AI doing a thing - ", timer)
 						end
 					end
 				end
@@ -2838,9 +2858,12 @@ function love.draw(mouseX, mouseY)
 	--connection links, link wigglers
 	for connectionIndex, connection in ipairs(connections) do 
 
-		love.graphics.print("destination: "..connection.destination,connection.connectionMidPoint.x, connection.connectionMidPoint.y)
-
 		love.graphics.setColor(0.9, 0.9, 0.2)
+
+		love.graphics.print("destination: "..connection.destination,connection.connectionMidPoint.x, connection.connectionMidPoint.y)
+		love.graphics.print("opposing: "..connection.opposedConnectionIndex.."/"..#connections,connection.connectionMidPoint.x+nodes[connection.source].x%50, connection.connectionMidPoint.y+50+nodes[connection.source].y%50)
+
+		
 
 		-- link making and wobble:
 				-- ((timer%2)*math.pi)  > this moves smoothly and linearly from 0 to 359.9
@@ -2890,14 +2913,15 @@ function love.draw(mouseX, mouseY)
 
 				if (connection.moving == true or Index+1 > 2) and Index < #connection.links  then  --- switching this to index+1 and removing the "-1" from lin
 
-					local linkToTargetDist
+					local linkToTargetDist = 500
 					if connection.destination == 1 then
 						-- if something flags here its probably to do with tentacle end 
-						print(connection.opposedConnectionIndex, " & ", connectionIndex)
-						print(#connections)
-						print(connections[connection.opposedConnectionIndex].tentacleEnd.x) -- issues here, opposedconnection index
-						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
-						
+						--print(connection.opposedConnectionIndex, " & ", connectionIndex)
+						print(connection.opposedConnectionIndex, " / ", #connections, " & also ... ", connectionIndex, connection.source, connection.team )
+						--print(connections[connection.opposedConnectionIndex].tentacleEnd.x) -- issues here, opposedconnection index
+						if connection.opposedConnectionIndex <= #connections then
+							linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
+						end
 					else
 						linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, connection.targetEdge.x, connection.targetEdge.y) --ignores wobble
 					end
@@ -2981,24 +3005,37 @@ function love.draw(mouseX, mouseY)
 			yWobble = nextYWobble
 		end
 
-		if connection.destination == 1 and (distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 or connection.moving == false)then
-			--create midpoint link
-			love.graphics.setColor(teamColours[connection.team])
-			-- animation spinning midpoint
-			love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
-			love.graphics.setColor(teamColours[connections[connection.opposedConnectionIndex].team])
-			love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+		if connection.destination == 1 and #connections >= connection.opposedConnectionIndex then
+			if (connection.moving == false) then
+				--create midpoint link
+				love.graphics.setColor(teamColours[connection.team])
+				-- animation spinning midpoint
+				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
+				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
 
-			-- midpoint border
-			love.graphics.setColor(1, 1, 1)
-			love.graphics.setLineWidth( 1 )
-			love.graphics.circle('line', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius+1)
+				love.graphics.setColor(teamColours[connections[connection.opposedConnectionIndex].team])
+				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+
+				-- midpoint border
+				love.graphics.setColor(1, 1, 1)
+				love.graphics.setLineWidth( 1 )
+				--love.graphics.circle('line', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius+1)
+				love.graphics.circle('line', connection.connectionMidPoint.x, connection.connectionMidPoint.y, linkRadius+1)
+			elseif distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 then
+
+
+			end
 		end
 	end
 
 
 	-- draw all nodes and population number
 	for nodeIndex, node in ipairs(nodes) do
+
+		love.graphics.setFont(font14 )
+		love.graphics.setColor(1,1,1)
+		love.graphics.print("node index: "..nodeIndex,node.x+100, node.y)
 
 		--background
 		love.graphics.setColor(0.5, 0.5, 0.5, 0.5)
@@ -3328,31 +3365,33 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
 		if editor == false or levelDoneMenu == false then
-			if nodeSelected > 0  and (nodes[nodeSelected].team == 2 or godModeON) then -- and pointSelected.x == 0
-				love.graphics.setColor(0.8, 0.8, 0)
-				love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
+			if nodeSelected > 0  then
+				if (nodes[nodeSelected].team == 2 or godModeON) then -- and pointSelected.x == 0
+					love.graphics.setColor(0.8, 0.8, 0)
+					love.graphics.line(nodes[nodeSelected].x, nodes[nodeSelected].y, love.mouse.getX(), love.mouse.getY()) -- arrow on mouse
 
-				local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
-				--print(angle/(2*math.pi) )
+					local angle = calculateSourceYAngleAny({x = nodes[nodeSelected].x, y = nodes[nodeSelected].y}, {x = love.mouse.getX(), y = love.mouse.getY()} )
+					--print(angle/(2*math.pi) )
 
-				--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
-				love.graphics.translate(love.mouse.getX(), love.mouse.getY())
-				love.graphics.rotate(-angle)
+					--rotate the whole screen centred on the node, and draw another set of feeler and wobblers each loop
+					love.graphics.translate(love.mouse.getX(), love.mouse.getY())
+					love.graphics.rotate(-angle)
 
-				--love.graphics.line(0, 0,0,50) --perpendicular line
+					--love.graphics.line(0, 0,0,50) --perpendicular line
 
-				love.graphics.line(0,0,-10,10)
-				love.graphics.circle('fill',-10,10,2.5)
-				love.graphics.line(0,0,-10,-10)
-				love.graphics.circle('fill',-10,-10,2.5)
+					love.graphics.line(0,0,-10,10)
+					love.graphics.circle('fill',-10,10,2.5)
+					love.graphics.line(0,0,-10,-10)
+					love.graphics.circle('fill',-10,-10,2.5)
 
-				love.graphics.translate(-love.mouse.getX(), -love.mouse.getY())
+					love.graphics.translate(-love.mouse.getX(), -love.mouse.getY())
 
-				-- unrotates and resets origin  
-				love.graphics.origin()
+					-- unrotates and resets origin  
+					love.graphics.origin()
 
 
-				--love.graphics.line(500,0,500,500)
+					--love.graphics.line(500,0,500,500)
+				end
 
 			elseif (editor == false) and nodeSelected == 0 and pointSelected.x ~= 0 then --shouldnt need not editor again
 				-- red line

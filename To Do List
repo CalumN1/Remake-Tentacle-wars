@@ -33,7 +33,7 @@ To Do List
 
 -	pause when window in background?
 
--	still a rare opposition issue, maybe only when one is latched, sometimes slip past each other  --- related to connection edges issue when tiering up/down
+-	still a rare opposition issue, maybe only when one is latched, sometimes slip past each other  --- related to the random mid points appearing because the opposed connection is pointing to the wrong place so the midpoint is between them
 
 -	add music?
 
