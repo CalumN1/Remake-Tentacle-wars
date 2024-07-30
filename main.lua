@@ -48,6 +48,7 @@ function love.load()
 
 	currentLevel = 100 -- 0 means menu, 100+ = custom level
 	powerLimit = 200
+	sessionTimer = 0
 	timer = 0
 
 	godModeON = false
@@ -584,6 +585,8 @@ end
 function love.update(dt)
 
 	 -- trying to force a locked logic rate e.g. 120 updates per second, as sometimes predator sends 3 or 1 instead of 2 in a row. turning off vsync gets fps to 500! not 165 and causes things like tentacles to move faster. tricky
+	sessionTimer = sessionTimer + dt
+
 	if not levelDoneMenu then
 		timer = timer + dt
 	end
@@ -857,7 +860,7 @@ function updateMovingConnections()
 						table.remove(connections, connectionIndex)
 						adjustConnectionIndexes(connectionIndex)
 						print("connection removed")
-						adjustConnectionEdges()
+						--adjustConnectionEdges()
 					end
 					
 				end
@@ -1582,7 +1585,7 @@ function cutConnection(connectionIndex, connection, ix, iy)
 	end
 
 	connection.moving = true --this triggers everything to start processing this tentacle again till resolved
-
+	adjustConnectionIndexes(connectionIndex)
 end
 
 
@@ -1610,7 +1613,7 @@ function love.mousepressed(mouseX, mouseY)
 			if editor then
 				if createMicrobe then
 					--create node of type specified 
-					if editTeam > 1 then
+					if editTeam > 1 then --not neutral
 						table.insert(nodes, {x = mouseX,
 							y = mouseY,
 							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
@@ -1622,7 +1625,7 @@ function love.mousepressed(mouseX, mouseY)
 							neutralPower = 30,
 							neutralTeam = 1 
 							})
-					else
+					else--neutral
 						table.insert(nodes, {x = mouseX,
 							y = mouseY,
 							team = editTeam,  -- team starts from 1 for teamColours[team] to make sense, 1 = grey, 2 = green, 3 = red, 4 = black, 5 = purple
@@ -1642,6 +1645,7 @@ function love.mousepressed(mouseX, mouseY)
 					for b = 11, 13 do
 						table.insert(buttonsOnScreen, allButtons[b])
 					end	
+					calculateNodeDistances()
 				else
 					--create wall
 					table.insert(walls, {
@@ -1857,41 +1861,60 @@ function love.mousepressed(mouseX, mouseY)
 				currentLevel = 100.5
 
 			elseif buttonsOnScreen[buttonSelected].name == "Test&Edit" then
-				calculateNodeDistances() 
-
-				connections = {}
-				editor = not editor --switch editor mode
-				--check what editor state we've just moved to
-				if editor then	-- also set occupied number for neutral nodes
-					--currentLevel = 0
-					
-					for nodeIndex, node in ipairs(nodes) do 
-						node.team = editorSaveState[nodeIndex].team
-						node.population = editorSaveState[nodeIndex].population
-						node.tentaclesUsed = 0
-					end
-					--print ("enode1 pop: ", editorSaveState[1].population)
-					--nodes = editorNodes 
-					--editorNodes is the save state to revert nodes to when leaving testing
-
-					buttonsOnScreen = editorButtons
-				else --i.e. now in testing
-					--currentLevel = 100.5
-					--print ("enode1 pop: ", editorSaveState[1].population)
-					editorSaveState = {}
-					for nodeIndex, node in ipairs(nodes) do 
-						table.insert(editorSaveState, {team = node.team, population = node.population}) 
-					end
-					--print ("saved - enode1 pop: ", editorSaveState[1].population)
-					--editorNodes = nodes --set save state to current setup
-
-					buttonsOnScreen = controlBarButtons
-					table.insert(buttonsOnScreen, allButtons[14])
-
-					timer = 0
-				end
 				
-				print("TESTING, Testing the edit")
+
+
+				if #nodes > 1 then
+					local playerXEnemy = { 0,0 }
+					local counter = 1
+					--count all node teams
+					while counter <= #nodes and (playerXEnemy[1] < 1 or playerXEnemy[2] < 1) do
+						if nodes[counter].team > 2 then
+							playerXEnemy[2] = playerXEnemy[2] + 1
+						elseif nodes[counter].team == 2 then
+							playerXEnemy[1] = playerXEnemy[1] + 1
+						end
+						counter = counter + 1
+					end
+					if playerXEnemy[1] > 0 and playerXEnemy[2] > 0 then -- enemy and player exists
+
+						calculateNodeDistances() 
+
+						connections = {}
+						editor = not editor --switch editor mode
+						--check what editor state we've just moved to
+						if editor then	-- also set occupied number for neutral nodes
+							--currentLevel = 0
+							
+							for nodeIndex, node in ipairs(nodes) do 
+								node.team = editorSaveState[nodeIndex].team
+								node.population = editorSaveState[nodeIndex].population
+								node.tentaclesUsed = 0
+							end
+							--print ("enode1 pop: ", editorSaveState[1].population)
+							--nodes = editorNodes 
+							--editorNodes is the save state to revert nodes to when leaving testing
+
+							buttonsOnScreen = editorButtons
+						else --i.e. now in testing
+							--currentLevel = 100.5
+							--print ("enode1 pop: ", editorSaveState[1].population)
+							editorSaveState = {}
+							for nodeIndex, node in ipairs(nodes) do 
+								table.insert(editorSaveState, {team = node.team, population = node.population}) 
+							end
+							--print ("saved - enode1 pop: ", editorSaveState[1].population)
+							--editorNodes = nodes --set save state to current setup
+
+							buttonsOnScreen = controlBarButtons
+							table.insert(buttonsOnScreen, allButtons[14])
+
+							timer = 0
+						end
+					
+						print("TESTING, Testing the edit")
+					end
+				end
 
 			elseif buttonsOnScreen[buttonSelected].name == "CreateX" then
 				local existsAlready = false
@@ -2460,102 +2483,106 @@ function enemyAI()
 	--only make 1 action per call (for each enemy)
 	local actionTaken = {false, false, false }
 
+	--check nodes in a random order
 	local randomizer = math.floor(love.math.random(0, (#nodes-0.1) ) )
 	print("AI could do something?")
-	for counter = 1, #nodes do
+	for counter = #nodes, 1, -1 do
+	--for nodeIndex, node in ipairs(nodes) do
+
 		local nodeIndex = counter + randomizer
 		
 
+		
 		if nodeIndex > #nodes then
 			nodeIndex = nodeIndex - (#nodes)  -- 7 -> 1
 		end
 		
 		
+		
 		local node = nodes[nodeIndex]
 		--print(counter, nodeIndex, #nodes)
-
+		
 	
-		if nodeIndex ~= 9 then	--waht? why?
-			--only act for enemy nodes
-			if node.team > 2 and actionTaken[node.team-2] ~= true then 
+		
+		--only act for enemy nodes
+		if node.team > 2 and actionTaken[node.team-2] ~= true then 
 
-				--only consider creating new tentacles for nodes with spare tentacles
-				if node.tentaclesUsed < nodeTiers[node.tier].maxTentacles then
-					--loop through each potential target node from closest to furthest away
-					if #nodeDistances[nodeIndex] > 0 then
-						for i = 1, #nodeDistances[nodeIndex] do
-							--print("looping: ", nodeIndex, i)
-							local targetNodeAndDistance = nodeDistances[nodeIndex][i]
-							--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
-							-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
-							--print(targetNodeAndDistance[1])
-							--print(nodes[targetNodeAndDistance[1]].team)
+			--only consider creating new tentacles for nodes with spare tentacles
+			if node.tentaclesUsed < nodeTiers[node.tier].maxTentacles then
+				--loop through each potential target node from closest to furthest away
+				if #nodeDistances[nodeIndex] > 0 then
+					for i = #nodeDistances[nodeIndex], 1, -1 do
+						--print("looping: ", nodeIndex, i)
+						local targetNodeAndDistance = nodeDistances[nodeIndex][i]
+						--print("Node ", targetNodeAndDistance[1], ", Distance ", math.floor(targetNodeAndDistance[2]), "minimum population to move: ", math.floor(12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))))
+						-- if there are enough population to reach the target and have at least 14,15,16,17 remaining     AND   not an ally with more population  
+						--print(targetNodeAndDistance[1])
+						--print(nodes[targetNodeAndDistance[1]].team)
 
-							--issue here ######## - the code errors here, attempted to index a nil value or something
+						--issue here ######## - the code errors here, attempted to index a nil value or something
 
 
-							if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
-								(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population < node.population -30 ) then    -- adjust the +10, what population gap determines when purple helps an ally?
+						if node.population > 12 + 1.2* ((targetNodeAndDistance[2] - (2*nodeTiers[node.tier].radius))/(2*linkRadius+linkSpacing))   and   
+							(  nodes[targetNodeAndDistance[1]].team ~= node.team   or   nodes[targetNodeAndDistance[1]].population < node.population -30 ) then    -- adjust the +10, what population gap determines when purple helps an ally?
 
-								-- check for duplicate connection
-								local connectionAlreadyExists = false
-								for connectionIndex, connection in ipairs(connections) do
-									if connection.source == nodeIndex and connection.target == targetNodeAndDistance[1] then 
-										connectionAlreadyExists = true
-										--print("ignored duplicate: ", connection.source, " -> ", connection.target)
-									end
-
+							-- check for duplicate connection
+							local connectionAlreadyExists = false
+							for connectionIndex, connection in ipairs(connections) do
+								if connection.source == nodeIndex and connection.target == targetNodeAndDistance[1] then 
+									connectionAlreadyExists = true
+									--print("ignored duplicate: ", connection.source, " -> ", connection.target)
 								end
 
+							end
 
 
-								-- check for wall intersection
-								local wallIntersection = false
-								for wallIndex, wall in ipairs(walls) do 
-									ix, iy = findIntersectionPoint(nodes[nodeIndex].x, nodes[nodeIndex].y, nodes[targetNodeAndDistance[1]].x, nodes[targetNodeAndDistance[1]].y, wall.startX, wall.startY, wall.endX, wall.endY)
-									if ix ~= nil and iy ~= nil then -- intersection exists
-										wallIntersection = true
-									end
+
+							-- check for wall intersection
+							local wallIntersection = false
+							for wallIndex, wall in ipairs(walls) do 
+								ix, iy = findIntersectionPoint(nodes[nodeIndex].x, nodes[nodeIndex].y, nodes[targetNodeAndDistance[1]].x, nodes[targetNodeAndDistance[1]].y, wall.startX, wall.startY, wall.endX, wall.endY)
+								if ix ~= nil and iy ~= nil then -- intersection exists
+									wallIntersection = true
 								end
+							end
 
 
 
-								if wallIntersection == false and connectionAlreadyExists == false then
+							if wallIntersection == false and connectionAlreadyExists == false then
 
-									--create connection
-									--print(targetNodeAndDistance[1])
-									createConnection(nodeIndex, targetNodeAndDistance[1])
-									actionTaken[node.team-2] = true
-									print("AI doing a thing")
-									--print("break!")
-									break
-								end
+								--create connection
+								--print(targetNodeAndDistance[1])
+								createConnection(nodeIndex, targetNodeAndDistance[1])
+								actionTaken[node.team-2] = true
+								print("AI doing a thing")
+								--print("break!")
+								break
 							end
 						end
 					end
 				end
+			end
 
-				for connectionIndex, connection in ipairs(connections) do 
-					if connection.source == nodeIndex then
+			for connectionIndex, connection in ipairs(connections) do 
+				if connection.source == nodeIndex then
 
-						--when to cut a tentacle
+					--when to cut a tentacle
 
-						--if same team 
-						-- numbers should work for 200 vs 20 =stay, and 200 vs 140 = stay?, 20 vs 10=cut, 10 vs 20=cut, 50 vs 20=cut?
-						if node.team == nodes[connection.target].team   and   node.population + 30  < nodes[connection.target].population then
+					--if same team 
+					-- numbers should work for 200 vs 20 =stay, and 200 vs 140 = stay?, 20 vs 10=cut, 10 vs 20=cut, 50 vs 20=cut?
+					if node.team == nodes[connection.target].team   and   node.population + 30  < nodes[connection.target].population then
 
-							--if nodes[connection.target].population+30 > node.population
+						--if nodes[connection.target].population+30 > node.population
 
-							ix, iy = connection.sourceEdge.x, connection.sourceEdge.y
+						ix, iy = connection.sourceEdge.x, connection.sourceEdge.y
 
-							cutConnection(connectionIndex, connection, ix, iy)
-							actionTaken[node.team-2] = true
-							print("AI doing a thing - ", timer)
-						end
+						cutConnection(connectionIndex, connection, ix, iy)
+						actionTaken[node.team-2] = true
+						print("AI doing a thing - ", timer)
 					end
 				end
-
 			end
+
 		end
 	end
 
@@ -2585,7 +2612,7 @@ function calculateNodeDistances()
 				end
 			end
 		end
-		--sort
+		--sort			---- reverse order
 		for distanceIndex1, distance1 in ipairs(eachNodesDistances) do
 			for distanceIndex2, distance2 in ipairs(eachNodesDistances) do
 				if distanceIndex1 ~= distanceIndex2 and distance1[2] > distance2[2] then
@@ -2851,6 +2878,16 @@ function love.draw(mouseX, mouseY)
 			love.graphics.setLineWidth( (node.tier + 7/(node.effectTimer+0.5)) -4 ) --5-12
 			love.graphics.circle('line',node.x, node.y, nodeTiers[node.tier].radius+60*(0.5-node.effectTimer)*((nodeTiers[node.tier].radius)/35))
 		end
+
+		-- node distances display
+		love.graphics.setColor(1, 1, 1)
+		if #nodeDistances == #nodes then
+			for x, nodeDistance in ipairs(nodeDistances[nodeIndex]) do
+				love.graphics.print(nodeDistance[1].. " , ".. nodeDistance[2], node.x, node.y+50+(x*30))
+			end
+		end
+
+
 	end
 
 
@@ -2882,11 +2919,11 @@ function love.draw(mouseX, mouseY)
 			local nextXWobble = 0
 			local nextYWobble = 0
 			if (Index+1 > 2 and Index < #connection.links -2) or (connection.moving == true and connection.destination ~= 3) then
-				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
-				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
+				nextXWobble = (math.sin(((sessionTimer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/2.5
+				nextYWobble = (math.sin(((sessionTimer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/2.5
 			elseif Index+1 == 2 or Index == #connection.links -2 then
-				nextXWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
-				nextYWobble = (math.sin(((timer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
+				nextXWobble = (math.sin(((sessionTimer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkYStep/5
+				nextYWobble = (math.sin(((sessionTimer-((Index+1)/10))%1.6)*1.25*math.pi))*connection.linkXStep/5
 
 			end
 
@@ -2960,15 +2997,15 @@ function love.draw(mouseX, mouseY)
 					love.graphics.line(
 						-linkRadius/2, 
 						-linkRadius/1.15,
-						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
-						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
+						-5 +(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
 
-					love.graphics.line( -5 +(((math.cos(((math.abs(timer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
-						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),
-						---20+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
-						--6-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4),
-						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
-						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
+					love.graphics.line( -5 +(((math.cos(((math.abs(sessionTimer%00.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),
+						---20+(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						--6-(3*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4),
+						2/wigglerShrink-22+(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
 					
 					--flip coordinates along the rotated y axis
 					love.graphics.scale(1,-1)
@@ -2977,13 +3014,13 @@ function love.draw(mouseX, mouseY)
 					love.graphics.line(
 						-linkRadius/2, 
 						-linkRadius/1.15,
-						-5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
-						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
+						-5 +(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2))
 					--love.graphics.setColor(teamColours[connection.team-1]) --green
-					love.graphics.line( -5 +(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
-						-(1.6*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),	
-						2/wigglerShrink-22+(((math.cos(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
-						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(timer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
+					love.graphics.line( -5 +(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2+0.5*math.pi)*5))*0.1), 
+						-(1.6*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*0.2),	
+						2/wigglerShrink-22+(((math.cos(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*5))*0.3), 
+						1/wigglerShrink+2-(3*linkRadius)+(((math.sin(((math.abs(sessionTimer%0.625-0.3125))%0.3125)*6.4*math.pi/2.2+0.7*math.pi)*1))*4))
 
 					--revert to normal
 					love.graphics.scale(1,-1)
@@ -3010,12 +3047,12 @@ function love.draw(mouseX, mouseY)
 				--create midpoint link
 				love.graphics.setColor(teamColours[connection.team])
 				-- animation spinning midpoint
-				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
-				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, 2*(timer%math.pi), math.pi+ 2*(timer%math.pi))
+				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, 2*(sessionTimer%math.pi), math.pi+ 2*(sessionTimer%math.pi))
+				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, 2*(sessionTimer%math.pi), math.pi+ 2*(sessionTimer%math.pi))
 
 				love.graphics.setColor(teamColours[connections[connection.opposedConnectionIndex].team])
-				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
-				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, math.pi+ 2*(timer%math.pi), 2*math.pi+ 2*(timer%math.pi))
+				--love.graphics.arc( 'fill', 'pie', (connection.tentacleEnd.x +connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2, linkRadius, math.pi+ 2*(sessionTimer%math.pi), 2*math.pi+ 2*(sessionTimer%math.pi))
+				love.graphics.arc( 'fill', 'pie', connection.connectionMidPoint.x, connection.connectionMidPoint.y,linkRadius, math.pi+ 2*(sessionTimer%math.pi), 2*math.pi+ 2*(sessionTimer%math.pi))
 
 				-- midpoint border
 				love.graphics.setColor(1, 1, 1)
@@ -3081,17 +3118,17 @@ function love.draw(mouseX, mouseY)
 				if node.tier == 2 then
 					--node feelers
 					love.graphics.line(node.x, node.y-(nodeTiers[node.tier].radius), 
-						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeTiers[node.tier].radius)+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
-						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeTiers[node.tier].radius)-5+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
-						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.5), node.y-(nodeTiers[node.tier].radius)-10+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.5),
-						node.x+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*1), node.y-(nodeTiers[node.tier].radius)-15+(((math.sin(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1))
+						node.x+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.1), node.y-(nodeTiers[node.tier].radius)+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.1),
+						node.x+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.2), node.y-(nodeTiers[node.tier].radius)-5+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2),
+						node.x+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*0.5), node.y-(nodeTiers[node.tier].radius)-10+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.5),
+						node.x+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi)*5))*1), node.y-(nodeTiers[node.tier].radius)-15+(((math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1))
 				elseif node.tier > 2 then
 
 					--node first inner wobblers
-					local InnerWobblerRadius = 3.4*(math.sin((timer+(3*nodeIndex+i*(3*(i+1.1))%1.38)%1)*2*math.pi)+2)
+					local InnerWobblerRadius = 3.4*(math.sin((sessionTimer+(3*nodeIndex+i*(3*(i+1.1))%1.38)%1)*2*math.pi)+2)
 					love.graphics.setColor(teamColours[node.team])
 					love.graphics.circle('fill', node.x, node.y-nodeTiers[node.tier].radius, InnerWobblerRadius)
-					--print(timer)
+					--print(sessionTimer)
 					--border
 					love.graphics.setColor(1, 1, 1)
 					love.graphics.circle('line', node.x, node.y-nodeTiers[node.tier].radius, InnerWobblerRadius)
@@ -3109,10 +3146,10 @@ function love.draw(mouseX, mouseY)
 						end
 
 						love.graphics.line(node.x, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
-							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - InnerWobblerRadius,
-							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - InnerWobblerRadius,
-							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - InnerWobblerRadius,
-							node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius)
+							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.1), node.y-(nodeTiers[node.tier].radius)-(2+1.5*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.2) - InnerWobblerRadius,
+							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.2), node.y-(nodeTiers[node.tier].radius)-(2+3*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.3) - InnerWobblerRadius,
+							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - InnerWobblerRadius,
+							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius)
 					
 
 						
@@ -3120,11 +3157,11 @@ function love.draw(mouseX, mouseY)
 						if node.tier > 3 then
 							--outer wobblers
 							love.graphics.setColor(teamColours[node.team])
-							love.graphics.circle('fill', node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
+							love.graphics.circle('fill', node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
 								linkRadius-2)
 							--border
 							love.graphics.setColor(1, 1, 1)
-							love.graphics.circle('line',  node.x+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((timer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
+							love.graphics.circle('line',  node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius,
 								linkRadius-2)
 							
 							--fix outer wobbler to follow this path:    --TODO
@@ -3142,12 +3179,12 @@ function love.draw(mouseX, mouseY)
 
 									-- side wobbler
 									love.graphics.setColor(teamColours[node.team])
-									love.graphics.circle('fill',node.x-(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
-										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
+									love.graphics.circle('fill',node.x-(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
 									-- border
 									love.graphics.setColor(1, 1, 1)
-									love.graphics.circle('line',node.x-(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
-										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((timer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
+									love.graphics.circle('line',node.x-(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
+										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
 
 									--testing points
 									--for a = 1, 24 do
@@ -3187,10 +3224,10 @@ function love.draw(mouseX, mouseY)
 						love.graphics.translate(-(node.x-2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
 
 						love.graphics.line(node.x-2.5, node.y-nodeTiers[node.tier].radius - InnerWobblerRadius, 
-						node.x-2-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
-						node.x-1-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
-						node.x-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
-						node.x-(math.sin(((timer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((timer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
+						node.x-2-(math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
+						node.x-1-(math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
+						node.x-(math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
+						node.x-(math.sin(((sessionTimer+(i*nodeIndex/10)+i/1.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((sessionTimer+(i*nodeIndex/10)+i/1.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
 
 						love.graphics.translate(node.x-2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
 						love.graphics.rotate(0.45)
@@ -3201,10 +3238,10 @@ function love.draw(mouseX, mouseY)
 						love.graphics.translate(-(node.x+2.5), -(node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius))
 
 						love.graphics.line(node.x+2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius, 
-						node.x+2+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
-						node.x+1+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
-						node.x+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
-						node.x+(math.sin(((timer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((timer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
+						node.x+2+(math.sin(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*1, node.y-2-(nodeTiers[node.tier].radius)-(((math.cos(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.5) - InnerWobblerRadius,
+						node.x+1+(math.sin(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*2, node.y-1-(nodeTiers[node.tier].radius)-9-(((math.cos(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.6) - InnerWobblerRadius,
+						node.x+(math.sin(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*5, node.y-(nodeTiers[node.tier].radius)-18-(((math.cos(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*0.8) - InnerWobblerRadius,
+						node.x+(math.sin(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((sessionTimer+(3+i*nodeIndex/7)+i/0.9)%0.8)*2.5*math.pi))*1)*1) - InnerWobblerRadius)
 
 						--rotate back to where we started this loop 
 						love.graphics.translate(node.x+2.5, node.y-(nodeTiers[node.tier].radius) - InnerWobblerRadius)
@@ -3214,13 +3251,13 @@ function love.draw(mouseX, mouseY)
 
 						--outer wobblers
 							love.graphics.setColor(teamColours[node.team])
-							love.graphics.circle('fill', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
-							love.graphics.circle('fill', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('fill', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((sessionTimer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('fill', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((sessionTimer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
 
 							--border
 							love.graphics.setColor(1, 1, 1)
-							love.graphics.circle('line', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
-							love.graphics.circle('line', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((timer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('line', node.x+(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((sessionTimer+(3*nodeIndex+i*(2.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
+							love.graphics.circle('line', node.x-(11+InnerWobblerRadius*0.5), node.y-4-nodeTiers[node.tier].radius - (InnerWobblerRadius*0.5), 2.2*(math.sin((sessionTimer+(3*nodeIndex+i*(3.5*(i+1.1))%1.38)%1)*2*math.pi)+2))
 						
 
 					end
@@ -3246,10 +3283,10 @@ function love.draw(mouseX, mouseY)
 		else
 			--draw occupation progress on neutral nodes
 			love.graphics.setColor(teamColours[node.neutralTeam])
-			love.graphics.circle('fill', node.x, node.y, (math.sin(timer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
+			love.graphics.circle('fill', node.x, node.y, (math.sin(sessionTimer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
 			--border
 			love.graphics.setColor(1,1,1)
-			love.graphics.circle('line', node.x, node.y, (math.sin(timer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
+			love.graphics.circle('line', node.x, node.y, (math.sin(sessionTimer%1*math.pi*2)/8+0.875) * (nodeCentreRadius* (node.population / math.floor(node.neutralPower/3))))
 		end
 
 		--used and available tentacles
@@ -3303,23 +3340,23 @@ function love.draw(mouseX, mouseY)
 
 		local wallPoints = {
 
-			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,-2, --wall-end, start side
-			4+(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4,2,
+			4+(1+math.sin((1.4*wallIndex)+math.pi+sessionTimer%2*math.pi))*4,-2, --wall-end, start side
+			4+(1+math.sin((1.4*wallIndex)+math.pi+sessionTimer%2*math.pi))*4,2,
 
 			0,10, -- wall.startX, wall.startY
-			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
-			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
-			distanceDiff/1.1 , 6+(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff/9 , 6+(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*2, --long line
+			distanceDiff/2 , 2+(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*6,
+			distanceDiff/1.1 , 6+(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*2,
 			distanceDiff, 10,
 
-			distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, --wall-end, end side
-			2, distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+timer%2*math.pi))*4, 
+			distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+sessionTimer%2*math.pi))*4, --wall-end, end side
+			2, distanceDiff-4-(1+math.sin((1.4*wallIndex)+math.pi+sessionTimer%2*math.pi))*4, 
 			-2, distanceDiff, -10,
 
 			
-			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2, --long line
-			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*6,
-			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+timer%2*math.pi))*2,
+			distanceDiff/1.1 , -6-(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*2, --long line
+			distanceDiff/2 , -2-(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*6,
+			distanceDiff/9 , -6-(1+math.sin((1.4*wallIndex)+sessionTimer%2*math.pi))*2,
 			0,-10
 		}
 
@@ -3862,11 +3899,11 @@ function hoverLevelDisplayDRAW(levelIndex)
 
 	--effect
 	love.graphics.setLineWidth( 8 )
-	love.graphics.setColor(1,1,1,1-(timer%1.5)/1.5)
-	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*(timer%1.5))
+	love.graphics.setColor(1,1,1,1-(sessionTimer%1.5)/1.5)
+	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*(sessionTimer%1.5))
 
-	love.graphics.setColor(1,1,1,1-((0.75+timer)%1.5)/1.5)
-	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*((0.75+timer)%1.5))
+	love.graphics.setColor(1,1,1,1-((0.75+sessionTimer)%1.5)/1.5)
+	love.graphics.circle('line',arenaWidth/2,arenaHeight/2+50,180-30*((0.75+sessionTimer)%1.5))
 
 	--permenant wider circle
 	love.graphics.setColor(1,1,1)

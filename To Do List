@@ -10,15 +10,11 @@ To Do List
 
 -	other AI Improvements?
 
-	-	slow down enemy AI -add a decision timer and only act when it reaches 0, starting even at 10 seconds? purple could be lower too
-
 	-	make AI oppose when attacked
 
 	-	let AI cut points vary, depending on populations?
 
 	-	make AI judge differences after moving the distance or ignore while moving? never cancel while on route?
-
-	-	make AI go for the best option when given many possible options e.g. if powerful, not just the first checked options e.g. furthest away node
 
 -	add upto level 15
 
@@ -34,6 +30,8 @@ To Do List
 -	pause when window in background?
 
 -	still a rare opposition issue, maybe only when one is latched, sometimes slip past each other  --- related to the random mid points appearing because the opposed connection is pointing to the wrong place so the midpoint is between them
+	-	when a node is cut I'm not updating opposed connection indexes!!! !!! !!!
+		--- fixed  ?! nope, test on level 10 and cut 4 connections
 
 -	add music?
 
