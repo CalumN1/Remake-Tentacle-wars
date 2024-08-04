@@ -1239,6 +1239,31 @@ function levelWalls(arenaWidth,arenaHeight)
 end
 
 
+function levelPowerLimits()
+	return
+	{
+		60, -- level 1
+		60, 
+		100, --3
+		100,
+		100, -- 5
+		60,
+		80, --7
+		80,
+		200, --9
+		100, --10
+		200, 
+		100, --12
+		150,
+		60, --14
+		100,
+		100, --16
+		50,
+		160, --18
+		80,
+		100 --20
+	}
+end
 
 
 

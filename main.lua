@@ -13,6 +13,7 @@ function love.load()
 
 	levelNodesTable = levelNodes(arenaWidth,arenaHeight)
 	levelWallsTable = levelWalls(arenaWidth,arenaHeight)
+	levelPowerLimitsTable = levelPowerLimits()
 
 	game_background = love.graphics.newImage('TwarsBackgroundClean.png')
 	menu_background = love.graphics.newImage('TwarsMenuBackgroundClean.png')
@@ -872,7 +873,10 @@ function updateMovingConnections()
 					-- closer to target, so its long and needs to move back
 					--print(connection.opposedConnectionIndex)
 					if distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 5 or 
-						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 20 then   ----- if node is already locked in, it doesnt move   TO-DO --------- also, wigglers
+						distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < --tentacles passed each other, move back
+						distancebetween(connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) then
+
+						--distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connection.targetEdge.x, connection.targetEdge.y) < 20 then   ----- if node is already locked in
 						-- touching
 						for linkIndex, link in ipairs(connection.links) do
 							link.x = link.x - (connection.linkXStep/20*160/FPSlogicTarget) -- back
@@ -934,7 +938,7 @@ function updateMovingConnections()
 				--compare distance of tentacle end vs node radius. i.e. if potential link is within radius
 				-- print(connection.connectionMidPoint.x )
 				if ( distancebetween(connection.tentacleEnd.x, connection.tentacleEnd.y, connections[connection.opposedConnectionIndex].tentacleEnd.x, connections[connection.opposedConnectionIndex].tentacleEnd.y) < 2 and 
-					math.abs(connection.tentacleEnd.x - connection.connectionMidPoint.x) < 2 and math.abs(connection.tentacleEnd.y - connection.connectionMidPoint.y) < 2  ) then
+					math.abs(connection.tentacleEnd.x - connection.connectionMidPoint.x) < 2 and math.abs(connection.tentacleEnd.y - connection.connectionMidPoint.y) < 2 ) then
 					print("Opposition locked")
 					connection.moving = false
 					connections[connection.opposedConnectionIndex].moving = false
@@ -1165,10 +1169,24 @@ function checkOpposedConnections()  -- need to fix rare opposed connection issue
 			--connections[connection.opposedConnectionIndex].moving = true
 			--connections[connection.opposedConnectionIndex].destination = 2
 			--connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0 
-			connection.opposedConnectionIndex = 0
+			connection1.opposedConnectionIndex = 0
 			--print(connectionIndex, connection.opposedConnectionIndex)
 		
 		end
+		if connection1.destination == 1 and connection1.opposedConnectionIndex > 0 and connection1.opposedConnectionIndex <= #connections then
+			if connections[connection1.opposedConnectionIndex].destination ~= 1 or connections[connection1.opposedConnectionIndex].opposedConnectionIndex ~= connectionIndex1 then
+				connection1.destination = 2 
+				connection1.opposedConnectionIndex = 0
+				connection1.moving = true
+				print("dodgy connection caught")
+			end
+		elseif connection1.opposedConnectionIndex > #connections then
+			connection1.destination = 2 
+			connection1.opposedConnectionIndex = 0
+			connection1.moving = true
+		end
+
+
 		for connectionIndex2, connection2 in ipairs(connections) do
 			-- work out if a connection is opposed and set opposed
 			if connection1.source == connection2.target and connection1.target == connection2.source and connectionIndex1 ~= connectionIndex2 and connection1.opposedConnectionIndex == 0 and 
@@ -1544,7 +1562,7 @@ function cutConnection(connectionIndex, connection, ix, iy)
 		-- go home
 		connection.destination = 0
 		nodes[connection.source].tentaclesUsed = nodes[connection.source].tentaclesUsed - 1
-		if connection.opposedConnectionIndex > 0 then
+		if connection.opposedConnectionIndex > 0 and connection.opposedConnectionIndex <= #connections and connection.opposedConnectionIndex ~= connectionIndex then
 			connections[connection.opposedConnectionIndex].opposedConnectionIndex = 0 
 			connections[connection.opposedConnectionIndex].destination = 2
 			connections[connection.opposedConnectionIndex].moving = true
@@ -1737,6 +1755,7 @@ function love.mousepressed(mouseX, mouseY)
 					current_background = game_background
 					nodes = levelNodesTable[currentLevel] 
 					walls = levelWallsTable[currentLevel] --walls dont change so no need to revert anything each time
+					powerLimit = levelPowerLimitsTable[currentLevel]
 
 					calculateNodeDistances()
 
@@ -1790,6 +1809,7 @@ function love.mousepressed(mouseX, mouseY)
 					current_background = game_background
 					nodes = levelNodesTable[currentLevel] 
 					walls = levelWallsTable[currentLevel] 
+					powerLimit = levelPowerLimitsTable[currentLevel]
 
 					calculateNodeDistances()
 
@@ -2880,13 +2900,13 @@ function love.draw(mouseX, mouseY)
 		end
 
 		-- node distances display
-		love.graphics.setColor(1, 1, 1)
+		--[[love.graphics.setColor(1, 1, 1)
 		if #nodeDistances == #nodes then
 			for x, nodeDistance in ipairs(nodeDistances[nodeIndex]) do
 				love.graphics.print(nodeDistance[1].. " , ".. nodeDistance[2], node.x, node.y+50+(x*30))
 			end
 		end
-
+		]]
 
 	end
 
@@ -2896,11 +2916,9 @@ function love.draw(mouseX, mouseY)
 	for connectionIndex, connection in ipairs(connections) do 
 
 		love.graphics.setColor(0.9, 0.9, 0.2)
-
 		love.graphics.print("destination: "..connection.destination,connection.connectionMidPoint.x, connection.connectionMidPoint.y)
 		love.graphics.print("opposing: "..connection.opposedConnectionIndex.."/"..#connections,connection.connectionMidPoint.x+nodes[connection.source].x%50, connection.connectionMidPoint.y+50+nodes[connection.source].y%50)
 
-		
 
 		-- link making and wobble:
 				-- ((timer%2)*math.pi)  > this moves smoothly and linearly from 0 to 359.9
@@ -2954,7 +2972,7 @@ function love.draw(mouseX, mouseY)
 					if connection.destination == 1 then
 						-- if something flags here its probably to do with tentacle end 
 						--print(connection.opposedConnectionIndex, " & ", connectionIndex)
-						print(connection.opposedConnectionIndex, " / ", #connections, " & also ... ", connectionIndex, connection.source, connection.team )
+						--print(connection.opposedConnectionIndex, " / ", #connections, " & also ... ", connectionIndex, connection.source, connection.team )
 						--print(connections[connection.opposedConnectionIndex].tentacleEnd.x) -- issues here, opposedconnection index
 						if connection.opposedConnectionIndex <= #connections then
 							linkToTargetDist = distancebetween(connection.links[Index].x, connection.links[Index].y, (connection.tentacleEnd.x + connections[connection.opposedConnectionIndex].tentacleEnd.x)/2, (connection.tentacleEnd.y + connections[connection.opposedConnectionIndex].tentacleEnd.y)/2) --ignores wobble
@@ -2989,7 +3007,6 @@ function love.draw(mouseX, mouseY)
 					--drawing link wigglers, todo: add another line so its more curved
 					--love.graphics.setColor(1,1,1)
 					
-
 					love.graphics.translate(linkCentre.x, linkCentre.y)
 					love.graphics.rotate(-angleFromY)
 
@@ -3151,8 +3168,6 @@ function love.draw(mouseX, mouseY)
 							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*0.5), node.y-(nodeTiers[node.tier].radius)-(2+4.5*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*0.6) - InnerWobblerRadius,
 							node.x+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%1.6)*1.25*math.pi)*(3+1.5*node.tier)))*1), node.y-(nodeTiers[node.tier].radius)-(2+6*node.tier)+(((math.sin(((sessionTimer+(i*nodeIndex/2.5)+i/1.9)%0.8)*2.25*math.pi)*0.2))*1) - InnerWobblerRadius)
 					
-
-						
 						
 						if node.tier > 3 then
 							--outer wobblers
@@ -3169,14 +3184,9 @@ function love.draw(mouseX, mouseY)
 								love.graphics.points(node.x-(math.sin(((a)%1.6)*1.25*math.pi))*0.9*10, node.y-(nodeTiers[node.tier].radius)-27-(((math.cos(((a)%0.8)*2.5*math.pi))*1)*1))
 							end]]
 
-
-
 							if node.tier == 6 then --Predator
-
-								
 								-- each wobbler gets 3 side wobblers around it
 								for b = 1,3 do
-
 									-- side wobbler
 									love.graphics.setColor(teamColours[node.team])
 									love.graphics.circle('fill',node.x-(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
@@ -3186,24 +3196,12 @@ function love.draw(mouseX, mouseY)
 									love.graphics.circle('line',node.x-(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
 										node.y-(nodeTiers[node.tier].radius)-(((math.cos(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8, 2.7*(math.sin(((sessionTimer+(2*b*i*nodeIndex/2.3)+b+i/1.9)%1)*2*math.pi)+2))
 
-									--testing points
-									--for a = 1, 24 do
-										--love.graphics.points(node.x-(math.sin(((a)%1)*2*math.pi))*(0.4+InnerWobblerRadius/20)*10, 
-										--node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.5)*4*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-8)
-										--love.graphics.circle('line',node.x-(math.sin(((a)%1.6)*1.25*math.pi))*(0.4+InnerWobblerRadius/20)*10, node.y-(nodeTiers[node.tier].radius)-(((math.cos(((a)%0.8)*2.5*math.pi))*(2.5-InnerWobblerRadius/10))*1)- InnerWobblerRadius-5, 5)
-									--end
-
 									--rotate the whole screen centred on the wobbler
 									love.graphics.translate(node.x, node.y-nodeTiers[node.tier].radius)
 									love.graphics.rotate(math.pi/1.5)
 									love.graphics.translate(-node.x, -(node.y-nodeTiers[node.tier].radius))
-
-									
 								end
-
-
 							end
-
 						end
 
 					elseif node.tier == 5 then --ant - 2 feelers each and basic extra wobblers
@@ -3401,7 +3399,7 @@ function love.draw(mouseX, mouseY)
 	love.graphics.setColor(0.8, 0.8, 0)
 	love.graphics.setLineWidth( 4 )
 	if love.mouse.isDown(1) then
-		if editor == false or levelDoneMenu == false then
+		if editor == false and levelDoneMenu == false then
 			if nodeSelected > 0  then
 				if (nodes[nodeSelected].team == 2 or godModeON) then -- and pointSelected.x == 0
 					love.graphics.setColor(0.8, 0.8, 0)
@@ -3719,9 +3717,11 @@ function love.draw(mouseX, mouseY)
 		elseif button.shape == "circle" then
 
 			if type(button.name) ~= "string" then
-				teamColours[levelProgress[button.name]][4] = 0.5
+
 				if not loadMenu then
-					love.graphics.setColor(teamColours[levelProgress[button.name]])
+					local displayColours = teamColours[levelProgress[button.name]]
+					displayColours[4] = 0.5
+					love.graphics.setColor(displayColours)
 					love.graphics.circle('fill',button.x,button.y,button.height)
 					--border
 					love.graphics.setColor(1,1,1)

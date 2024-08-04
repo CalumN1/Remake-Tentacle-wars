@@ -1,37 +1,48 @@
 To Do List
 
+______________
+
+Must do before finishing:
+
 - 	fix connection edges being in between the cut off, so currently each time a tier up happens links are removed and added back and forth as it is inbetween cutoffs
 
--	fix feelers to arc correctly
+-	adjust delivery speeds- still todo?
 
--	adjust delivery speeds
+-	rarer connection issue spotted, one went to target one went to midpoint
 
-- 	use points to add more effects e.g. circling tentacles or nodes
-
--	other AI Improvements?
+-	AI Improvements
 
 	-	make AI oppose when attacked
 
 	-	let AI cut points vary, depending on populations?
 
-	-	make AI judge differences after moving the distance or ignore while moving? never cancel while on route?
+	-	make purple better
 
 -	add upto level 15
 
 -	add upto level 20
-
--	add scoring, only based on timer? or 
 
 -	add power limits to levels
 
 -	add power limits to editor
 	-	and to level saving
 
--	pause when window in background?
+-	make editor look nicer
 
--	still a rare opposition issue, maybe only when one is latched, sometimes slip past each other  --- related to the random mid points appearing because the opposed connection is pointing to the wrong place so the midpoint is between them
-	-	when a node is cut I'm not updating opposed connection indexes!!! !!! !!!
-		--- fixed  ?! nope, test on level 10 and cut 4 connections
+
+_______________
+
+
+
+Optional tasks:
+
+-	fix feelers to arc correctly
+
+- 	use points to add more effects e.g. circling tentacles or nodes
+
+-	add scoring, only based on timer? or 
+
+-	pause when window in background?
 
 -	add music?
 
@@ -41,6 +52,4 @@ To Do List
 
 -	Improve menu
 
-	-	menu transition fade
-
--	fix the look of the editor 
+	-	menu transition fade?
