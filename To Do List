@@ -4,7 +4,7 @@ ______________
 
 Must do before finishing:
 
-- 	fix connection edges being in between the cut off, so currently each time a tier up happens links are removed and added back and forth as it is inbetween cutoffs
+- 	fix connection edges being in between the cut off, so currently each time a tier up happens links are removed and added back and forth as it is 	  	inbetween cutoffs
 
 -	adjust delivery speeds- still todo?
 
@@ -18,11 +18,7 @@ Must do before finishing:
 
 	-	make purple better
 
--	add upto level 15
-
 -	add upto level 20
-
--	add power limits to levels
 
 -	add power limits to editor
 	-	and to level saving
@@ -35,6 +31,8 @@ _______________
 
 
 Optional tasks:
+
+-	add levels from Tentacles Wars 1
 
 -	fix feelers to arc correctly
 

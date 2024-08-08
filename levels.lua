@@ -1029,7 +1029,7 @@ function levelNodes(arenaWidth,arenaHeight)
 				neutralTeam =  1
 			}	
 		},
-		{	--level	
+		{	--level	14
 			{ 
 				x = 0.49027777777778*arenaWidth,
 				y =  0.23425925925926*arenaHeight,
@@ -1095,6 +1095,506 @@ function levelNodes(arenaWidth,arenaHeight)
 				y =  0.85833333333333*arenaHeight,
 				team =  2,
 				population =  10,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			}	
+		},
+		{	--level	15
+			{ 
+				x = 0.25277777777778*arenaWidth,
+				y =  0.569*arenaHeight,
+				team =  2,
+				population =  50,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.31458333333333*arenaWidth,
+				y =  0.30462962962963*arenaHeight,
+				team =  4,
+				population =  50,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.65486111111111*arenaWidth,
+				y =  0.815*arenaHeight,
+				team =  1,
+				population =  0,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 50,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.76111111111111*arenaWidth,
+				y =  0.31574074074074*arenaHeight,
+				team =  3,
+				population =  50,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.52847222222222*arenaWidth,
+				y =  0.1712962962963*arenaHeight,
+				team =  2,
+				population =  10,
+				tier =  1,
+				regenTimer = 2, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.78333333333333*arenaWidth,
+				y =  0.569*arenaHeight,
+				team =  4,
+				population =  10,
+				tier =  1,
+				regenTimer = 2, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.39791666666667*arenaWidth,
+				y =  0.815*arenaHeight,
+				team =  3,
+				population =  10,
+				tier =  1,
+				regenTimer = 2, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 0,
+				neutralTeam =  1
+			}	
+		},
+		{	--level	16
+			{ 
+				x = 0.13*arenaWidth,
+				y =  0.31*arenaHeight,
+				team =  2,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 50,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.89*arenaWidth,
+				y =  0.31*arenaHeight,
+				team =  2,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.51*arenaWidth,
+				y =  0.31*arenaHeight,
+				team =  2,
+				population =  10,
+				tier =  1,
+				regenTimer = 2, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.51*arenaWidth,
+				y =  0.71388888888889*arenaHeight,
+				team =  2,
+				population =  100,
+				tier =  4,
+				regenTimer = 3, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.82*arenaWidth,
+				y =  0.65555555555556*arenaHeight,
+				team =  5,
+				population =  70,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.20*arenaWidth,
+				y =  0.65555555555556*arenaHeight,
+				team =  5,
+				population =  70,
+				tier =  3,
+				regenTimer = 2.5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			}	
+		},
+		{	--level	17
+			{ 
+				x = 0.31*arenaWidth,
+				y =  0.168*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.31*arenaWidth,
+				y =  0.37*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.113*arenaWidth,
+				y =  0.168*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.496*arenaWidth,
+				y =  0.168*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.872*arenaWidth,
+				y =  0.168*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.688*arenaWidth,
+				y =  0.168*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.688*arenaWidth,
+				y =  0.37*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.496*arenaWidth,
+				y =  0.37*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.872*arenaWidth,
+				y =  0.37*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.113*arenaWidth,
+				y =  0.37*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.688*arenaWidth,
+				y =  0.596*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.31*arenaWidth,
+				y =  0.596*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.496*arenaWidth,
+				y =  0.596*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.872*arenaWidth,
+				y =  0.596*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.113*arenaWidth,
+				y =  0.596*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.31*arenaWidth,
+				y =  0.822*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.688*arenaWidth,
+				y =  0.822*arenaHeight,
+				team =  5,
+				population =  30,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.872*arenaWidth,
+				y =  0.822*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.496*arenaWidth,
+				y =  0.822*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.113*arenaWidth,
+				y =  0.822*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			}	
+		},
+		{	--level	18
+			{ 
+				x = 0.86111111111111*arenaWidth,
+				y =  0.18333333333333*arenaHeight,
+				team =  5,
+				population =  160,
+				tier =  6,
+				regenTimer = 5, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.29305555555556*arenaWidth,
+				y =  0.57407407407407*arenaHeight,
+				team =  2,
+				population =  10,
+				tier =  1,
+				regenTimer = 2, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.50208333333333*arenaWidth,
+				y =  0.73148148148148*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.33402777777778*arenaWidth,
+				y =  0.85462962962963*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.15555555555556*arenaWidth,
+				y =  0.79074074074074*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.088888888888889*arenaWidth,
+				y =  0.56574074074074*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.13263888888889*arenaWidth,
+				y =  0.3462962962963*arenaHeight,
+				team =  2,
+				population =  20,
+				tier =  2,
+				regenTimer = 2.4, 
+				tentaclesUsed = 0,
+				effectTimer = 0,
+				neutralPower = 30,
+				neutralTeam =  1
+			},
+			{ 
+				x = 0.29861111111111*arenaWidth,
+				y =  0.28148148148148*arenaHeight,
+				team =  2,
+				population =  20,
 				tier =  2,
 				regenTimer = 2.4, 
 				tentaclesUsed = 0,
@@ -1234,7 +1734,58 @@ function levelWalls(arenaWidth,arenaHeight)
 				endX = 0.49305555555556*arenaWidth,
 				endY =  0.46944444444444*arenaHeight 
 			},
-		}
+		},
+		{ -- level 15
+		},
+		{	--level	16
+			{ 
+				startX = 0.99*arenaWidth,
+				startY =  0.17*arenaHeight,
+				endX = 0.73*arenaWidth,
+				endY =  0.17*arenaHeight 
+			},
+			{ 
+				startX = 0.75*arenaWidth,
+				startY =  0.39*arenaHeight,
+				endX = 0.72*arenaWidth,
+				endY =  0.2*arenaHeight 
+			},
+			{ 
+				startX = 0.635*arenaWidth,
+				startY =  0.837*arenaHeight,
+				endX = 0.58*arenaWidth,
+				endY =  0.59*arenaHeight 
+			},
+			{ 
+				startX = 0.385*arenaWidth,
+				startY =  0.837*arenaHeight,
+				endX = 0.44*arenaWidth,
+				endY =  0.59*arenaHeight 
+			},
+			{ 
+				startX = 0.4*arenaWidth,
+				startY =  0.855*arenaHeight,
+				endX = 0.62*arenaWidth,
+				endY =  0.855*arenaHeight 
+			},
+			{ 
+				startX = 0.29*arenaWidth,
+				startY =  0.17*arenaHeight,
+				endX = 0.01*arenaWidth,
+				endY =  0.17*arenaHeight 
+			},
+			{ 
+				startX = 0.30*arenaWidth,
+				startY =  0.2*arenaHeight,
+				endX = 0.27*arenaWidth,
+				endY =  0.39*arenaHeight 
+			}	
+		},
+		{ -- level 17
+		},
+		{ -- level 18
+		},
+
 	}
 end
 
